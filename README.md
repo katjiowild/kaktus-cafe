@@ -68,14 +68,19 @@ Both providers only accept sign-ins that come back to a **registered redirect UR
 https://katjiowild.github.io/kaktus-cafe/
 ```
 
-- **Google** — Cloud Console → Credentials → your OAuth client → *Authorised redirect URIs*. Keep the consent screen in **Testing** with yourself as the sole test user; that avoids the public-app verification process. Add `http://localhost:5173/kaktus-cafe/` too if you ever want sync to work while developing.
+- **Google** — signs in through **Google Identity Services** in a popup, not a redirect, so what matters is *Authorised JavaScript origins*, not redirect URIs. Add the **origin only, no path**:
+  ```
+  https://katjiowild.github.io
+  http://localhost:5173
+  ```
+  Keep the consent screen in **Testing** with yourself as the sole test user; that avoids the public-app verification process.
 - **Microsoft** — the registration already has a SPA redirect URI; make sure `Calendars.Read` (delegated) is granted under API permissions. The authority is `/common`, so personal Microsoft accounts work alongside work ones.
 
-> **One thing to watch on Google.** A browser app doing PKCE has to be a *public* client. If the OAuth client was created as a **Web application**, Google may demand a `client_secret` at the token step and sign-in will fail — the app detects exactly that and says so.
+> **Why the two providers work differently.** Google's "Web application" OAuth clients require a `client_secret` at the token endpoint, which a browser app cannot hold — so Authorization Code + PKCE cannot complete against one. (A "Desktop app" client isn't an alternative either: those only accept loopback redirect URIs and can never return to the hosted app.) Google is therefore signed in through **Google Identity Services**, which hands back an access token directly with no secret.
 >
-> If that happens, the fix is **not** a "Desktop app" client: those only accept loopback (`http://localhost`) redirect URIs, so they can't return to a GitHub Pages URL at all. The fix is to keep the Web client and switch the Google path to **Google Identity Services** (`google.accounts.oauth2.initTokenClient`), the flow Google supports for browser-only apps with no secret. Trade-off: it issues no refresh token, so tokens last about an hour and are re-acquired (usually silently) on the next sync.
+> The trade-off is that GIS issues no refresh token, so Google tokens last about an hour. That's invisible in practice: when one expires, the app asks GIS to re-issue silently (`prompt: ''`), which succeeds while the Google session is alive, and sync only ever runs from a button press. If the session has genuinely lapsed, you get a "reconnect" message rather than a silent failure.
 >
-> Microsoft has no such restriction — SPA redirect URIs, PKCE and refresh tokens all work as implemented.
+> Microsoft has no such restriction — SPA redirect URIs, PKCE and refresh tokens all work as implemented, so Outlook uses the redirect flow.
 
 ## Contacts import (Phase 3)
 

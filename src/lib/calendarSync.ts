@@ -1,6 +1,7 @@
 import { db, uid } from '../db';
 import { isoNow } from './dates';
 import { OAuthError, PROVIDERS, refresh } from './oauth';
+import { requestGoogleToken } from './googleAuth';
 import type { CalendarAccount, Meeting, Person } from '../types';
 
 /**
@@ -51,6 +52,22 @@ export async function disconnectAccount(accountId: string): Promise<void> {
 /** Returns a valid access token, refreshing quietly if it has expired. */
 async function freshToken(account: CalendarAccount): Promise<string> {
   if (Date.now() < account.expiresAt - 60_000) return account.accessToken;
+
+  // Google (GIS) has no refresh token — ask for a silent re-issue instead,
+  // which works as long as the Google session is alive.
+  if (account.provider === 'google') {
+    const token = await requestGoogleToken(false);
+    const accounts = await loadAccounts();
+    await saveAccounts(
+      accounts.map((a) =>
+        a.id === account.id
+          ? { ...a, accessToken: token.accessToken, expiresAt: token.expiresAt }
+          : a,
+      ),
+    );
+    return token.accessToken;
+  }
+
   if (!account.refreshToken) {
     throw new OAuthError('This connection has expired — reconnect the account.');
   }
