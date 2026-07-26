@@ -36,6 +36,19 @@ class KaktusDB extends Dexie {
             if (typeof t.urgent !== 'boolean') t.urgent = false;
           });
       });
+
+    // v3 — Note.personIds (v5 §2), backfilled to an empty array so every
+    // consumer can map over it without a guard.
+    this.version(3)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx
+          .table<Note>('notes')
+          .toCollection()
+          .modify((n) => {
+            if (!Array.isArray(n.personIds)) n.personIds = [];
+          });
+      });
   }
 }
 

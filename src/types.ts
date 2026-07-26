@@ -86,6 +86,8 @@ export interface Note {
   body: string;
   /** Notes tag to a Project, not a free-text category (§3.4). */
   projectId: string | null;
+  /** Linked People — mirrors Meeting.personIds (v5 §2). */
+  personIds: string[];
   /** ISO date. */
   date: string;
   pinned: boolean;

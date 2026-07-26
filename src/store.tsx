@@ -63,6 +63,8 @@ export interface Store extends Data {
   removeMilestone: (projectId: string, milestoneId: string) => Promise<void>;
   moveMilestone: (projectId: string, milestoneId: string, dir: -1 | 1) => Promise<void>;
   addComment: (projectId: string, text: string) => Promise<void>;
+  /** Project↔Person lives on Person.projectIds — one side, no duplicate field. */
+  setProjectPeople: (projectId: string, personIds: string[]) => Promise<void>;
 
   createTask: (input: {
     title: string;
@@ -83,6 +85,7 @@ export interface Store extends Data {
     title: string;
     body: string;
     projectId: string | null;
+    personIds: string[];
   }) => Promise<void>;
   toggleNotePin: (id: string) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
@@ -91,6 +94,7 @@ export interface Store extends Data {
     id?: string;
     title: string;
     datetime: string;
+    personIds: string[];
     peopleText: string;
     location: string;
     notes?: string;
@@ -361,6 +365,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         showToast('Saved');
       },
 
+      async setProjectPeople(projectId, personIds) {
+        const people = await db.people.toArray();
+        await Promise.all(
+          people.map((p) => {
+            const linked = personIds.includes(p.id);
+            const has = p.projectIds.includes(projectId);
+            if (linked === has) return Promise.resolve(0);
+            const next = linked
+              ? [...p.projectIds, projectId]
+              : p.projectIds.filter((id) => id !== projectId);
+            return db.people.update(p.id, { projectIds: next, updatedAt: isoNow() });
+          }),
+        );
+        await after();
+      },
+
       // ---------- Tasks ----------
       async createTask({ title, projectId, dueDate, recurrence, urgent }) {
         const now = isoNow();
@@ -485,16 +505,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       // ---------- Notes ----------
-      async saveNote({ id, title, body, projectId }) {
+      async saveNote({ id, title, body, projectId, personIds }) {
         const now = isoNow();
         if (id) {
-          await db.notes.update(id, { title, body, projectId, updatedAt: now });
+          await db.notes.update(id, { title, body, projectId, personIds, updatedAt: now });
         } else {
           await db.notes.add({
             id: uid('note'),
             title,
             body,
             projectId,
+            personIds,
             date: isoDate(),
             pinned: false,
             createdAt: now,
@@ -520,20 +541,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       // ---------- Meetings ----------
-      async saveMeeting({ id, title, datetime, peopleText, location, notes }) {
+      async saveMeeting({ id, title, datetime, personIds, peopleText, location, notes }) {
         const now = isoNow();
-        // Link attendees to Person records where the name matches — the spec
-        // wants relationships, but typing a name shouldn't be blocked on the
-        // person existing in the CRM first.
-        const people = await db.people.toArray();
-        const names = peopleText
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
-        const personIds = names
-          .map((n) => people.find((p) => p.name.toLowerCase() === n.toLowerCase())?.id)
-          .filter((x): x is string => Boolean(x));
-
+        // Links come from the picker now (v5 §2) rather than being guessed by
+        // name-matching free text. `peopleText` stays for attendees who aren't
+        // CRM records ("the team").
         if (id) {
           await db.meetings.update(id, {
             title,

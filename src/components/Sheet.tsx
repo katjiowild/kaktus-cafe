@@ -4,6 +4,7 @@ import { useStore, type TemplateKey } from '../store';
 import { isoDate, WEEKDAY_LETTERS } from '../lib/dates';
 import type { Cadence, ProjectType, Recurrence } from '../types';
 import { Checkbox, ToggleRow } from './ui';
+import { PersonPicker } from './PersonPicker';
 
 export type SheetState =
   | { type: 'task'; taskId?: string; projectId?: string | null }
@@ -414,6 +415,7 @@ function NoteSheet({ state, onClose }: { state: SheetState & { type: 'note' }; o
   const [projectId, setProjectId] = useState<string | null>(
     existing?.projectId ?? state.projectId ?? null,
   );
+  const [personIds, setPersonIds] = useState<string[]>(existing?.personIds ?? []);
 
   const save = async () => {
     if (!body.trim()) {
@@ -425,6 +427,7 @@ function NoteSheet({ state, onClose }: { state: SheetState & { type: 'note' }; o
       title: title.trim() || 'Untitled',
       body: body.trim(),
       projectId,
+      personIds,
     });
     onClose();
   };
@@ -452,6 +455,13 @@ function NoteSheet({ state, onClose }: { state: SheetState & { type: 'note' }; o
       </Field>
       <Field>
         <ProjectSelect value={projectId} onChange={setProjectId} />
+      </Field>
+      <Field>
+        <PersonPicker
+          selected={personIds}
+          onChange={setPersonIds}
+          hint="Linked notes show on each person's page."
+        />
       </Field>
 
       {existing && (
@@ -534,6 +544,10 @@ function ProjectSheet({
   const [startDate, setStartDate] = useState(existing?.startDate ?? isoDate());
   const [endDate, setEndDate] = useState(existing?.endDate ?? '');
   const [cadence, setCadence] = useState<Cadence>(existing?.cadence ?? 'weekly');
+  // Project↔Person is stored on the Person side, so read the current links out.
+  const [personIds, setPersonIds] = useState<string[]>(
+    existing ? store.people.filter((p) => p.projectIds.includes(existing.id)).map((p) => p.id) : [],
+  );
 
   const save = async () => {
     const n = name.trim();
@@ -549,9 +563,10 @@ function ProjectSheet({
         endDate: existing.type === 'active' ? endDate || null : null,
         cadence: existing.type === 'retainer' ? cadence : null,
       });
+      await store.setProjectPeople(existing.id, personIds);
       store.showToast('Project updated');
     } else {
-      await store.createProject({
+      const newId = await store.createProject({
         name: n,
         type,
         template,
@@ -560,6 +575,7 @@ function ProjectSheet({
         endDate: type === 'active' ? endDate || null : null,
         cadence: type === 'retainer' ? cadence : null,
       });
+      await store.setProjectPeople(newId, personIds);
       store.showToast('Project created');
     }
     onClose();
@@ -624,6 +640,15 @@ function ProjectSheet({
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What is this project?"
           style={{ ...input, resize: 'none', minHeight: 64, fontSize: 14 }}
+        />
+      </Field>
+
+      <Field>
+        <PersonPicker
+          selected={personIds}
+          onChange={setPersonIds}
+          label="People involved"
+          hint="Shows this project on their page, and them on this project."
         />
       </Field>
 
@@ -740,6 +765,7 @@ function MeetingSheet({
   const [time, setTime] = useState(
     `${String(init.getHours()).padStart(2, '0')}:${String(init.getMinutes()).padStart(2, '0')}`,
   );
+  const [personIds, setPersonIds] = useState<string[]>(existing?.personIds ?? []);
   const [peopleText, setPeopleText] = useState(existing?.peopleText ?? '');
   const [location, setLocation] = useState(existing?.location ?? '');
   const [notes, setNotes] = useState(existing?.notes ?? '');
@@ -754,6 +780,7 @@ function MeetingSheet({
       id: existing?.id,
       title: t,
       datetime: new Date(`${date}T${time || '09:00'}`).toISOString(),
+      personIds,
       peopleText,
       location,
       notes,
@@ -840,15 +867,18 @@ function MeetingSheet({
         </div>
       </Field>
       <Field>
-        <label style={label}>With</label>
+        <PersonPicker selected={personIds} onChange={setPersonIds} label="With" />
+      </Field>
+      <Field>
+        <label style={label}>Anyone else</label>
         <input
           value={peopleText}
           onChange={(e) => setPeopleText(e.target.value)}
-          placeholder="e.g. Sam Rivera, Alex Chen"
+          placeholder="e.g. the team"
           style={input}
         />
         <div style={{ fontSize: 11, color: C.muted, marginTop: 5 }}>
-          Names that match someone in People are linked to their record automatically.
+          For attendees you don't keep in People.
         </div>
       </Field>
       <Field>

@@ -1,7 +1,7 @@
-import { C, dashedBtn, SERIF } from '../tokens';
+import { ACCENT, C, dashedBtn, SERIF } from '../tokens';
 import { useStore } from '../store';
 import { shortDate } from '../lib/dates';
-import { Avatar, Card, EmptyState, PencilIcon, SectionHeader } from '../components/ui';
+import { Avatar, Card, EmptyState, PencilIcon, SectionHeader, TypeBadge } from '../components/ui';
 import type { ViewProps } from './types';
 
 export function People({ wide, openPerson, openSheet }: ViewProps) {
@@ -66,9 +66,9 @@ export function People({ wide, openPerson, openSheet }: ViewProps) {
   );
 }
 
-export function PersonDetail({ wide, activePersonId, openSheet }: ViewProps) {
+export function PersonDetail({ wide, activePersonId, openSheet, openProject }: ViewProps) {
   const store = useStore();
-  const { people, meetings } = store;
+  const { people, meetings, notes, projects } = store;
   const person = people.find((p) => p.id === activePersonId);
   const index = people.findIndex((p) => p.id === activePersonId);
 
@@ -95,10 +95,14 @@ export function PersonDetail({ wide, activePersonId, openSheet }: ViewProps) {
     );
   }
 
-  // Meetings this person is linked to — a live relationship, not a kept list.
+  // Everything connected to this person, read live off the relationships (v5 §2).
   const theirMeetings = meetings
     .filter((m) => m.personIds.includes(person.id))
     .sort((a, b) => b.datetime.localeCompare(a.datetime));
+  const theirNotes = notes
+    .filter((n) => n.personIds.includes(person.id))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const theirProjects = projects.filter((p) => person.projectIds.includes(p.id));
 
   return (
     <div
@@ -230,6 +234,71 @@ export function PersonDetail({ wide, activePersonId, openSheet }: ViewProps) {
             ))}
           </div>
         </div>
+      )}
+
+      {theirProjects.length > 0 && (
+        <>
+          <SectionHeader title="Projects" meta={String(theirProjects.length)} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {theirProjects.map((p) => (
+              <div
+                key={p.id}
+                onClick={() => openProject(p.id)}
+                style={{
+                  background: C.card,
+                  border: `1px solid ${C.cardBorder}`,
+                  borderLeft: `4px solid ${ACCENT[p.type]}`,
+                  borderRadius: 12,
+                  padding: '12px 13px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                }}
+              >
+                <span style={{ fontSize: 14, fontWeight: 600, flex: 1, minWidth: 0 }}>{p.name}</span>
+                <TypeBadge type={p.type} />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {theirNotes.length > 0 && (
+        <>
+          <SectionHeader title="Notes" meta={String(theirNotes.length)} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {theirNotes.map((n) => (
+              <div
+                key={n.id}
+                onClick={() => openSheet({ type: 'note', noteId: n.id })}
+                style={{
+                  background: C.card,
+                  border: `1px solid ${C.cardBorder}`,
+                  borderRadius: 12,
+                  padding: '12px 13px',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{n.title}</div>
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    color: C.softInk,
+                    lineHeight: 1.45,
+                    marginTop: 4,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {n.body}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {theirMeetings.length > 0 && (
