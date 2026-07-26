@@ -88,6 +88,9 @@ export interface Note {
   projectId: string | null;
   /** Linked People — mirrors Meeting.personIds (v5 §2). */
   personIds: string[];
+  /** The meeting this came out of, if any. Notes taken in a meeting are
+   *  ordinary Notes: they show in the Notes list and on the meeting. */
+  meetingId: string | null;
   /** ISO date. */
   date: string;
   pinned: boolean;
@@ -111,7 +114,6 @@ export interface Meeting {
   externalId: string | null;
   /** Which connected account this came from — null for local meetings (v5 §3). */
   accountId: string | null;
-  notes: string;
   createdAt: string;
   updatedAt: string;
 }

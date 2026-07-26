@@ -226,7 +226,6 @@ export async function syncAccount(account: CalendarAccount): Promise<SyncResult>
         source: account.provider,
         externalId: e.externalId,
         accountId: account.id,
-        notes: '',
         createdAt: now,
         updatedAt: now,
       };
@@ -236,9 +235,14 @@ export async function syncAccount(account: CalendarAccount): Promise<SyncResult>
   }
 
   // Events deleted upstream: drop ours too, but keep any we've written notes
-  // against — losing her notes to someone else's cancellation would be worse
-  // than a stale row.
-  const stale = existing.filter((m) => !seen.has(m.externalId ?? '') && !m.notes.trim());
+  // against — losing the context for those notes to someone else's cancellation
+  // would be worse than a stale row.
+  const notedMeetingIds = new Set(
+    (await db.notes.toArray()).map((n) => n.meetingId).filter((id): id is string => Boolean(id)),
+  );
+  const stale = existing.filter(
+    (m) => !seen.has(m.externalId ?? '') && !notedMeetingIds.has(m.id),
+  );
   const inWindow = stale.filter((m) => {
     const t = new Date(m.datetime).getTime();
     return t > Date.now() - DAYS_BACK * 86400000 && t < Date.now() + DAYS_FORWARD * 86400000;

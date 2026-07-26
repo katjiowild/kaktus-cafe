@@ -13,6 +13,7 @@ export function Today({ openProject, openSheet }: ViewProps) {
   const accountEmail = useAccountEmail();
   const { projects, tasks, meetings, notes, dismissed } = store;
   const todayIso = isoDate();
+  const notesFor = (meetingId: string) => notes.filter((n) => n.meetingId === meetingId);
 
   // §5.3 — Active projects idle for ≥7 days, not dismissed.
   const nudges = projects
@@ -138,21 +139,20 @@ export function Today({ openProject, openSheet }: ViewProps) {
                   📍 {m.location}
                 </div>
               )}
-              {m.notes.trim() && (
+              {notesFor(m.id).length > 0 && (
                 <div
                   style={{
                     fontSize: 12.5,
                     color: C.softInk,
                     marginTop: 6,
                     lineHeight: 1.45,
-                    whiteSpace: 'pre-wrap',
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden',
                   }}
                 >
-                  {m.notes}
+                  {notesFor(m.id)[0].body}
                 </div>
               )}
             </div>

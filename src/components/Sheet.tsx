@@ -8,7 +8,7 @@ import { PersonPicker } from './PersonPicker';
 
 export type SheetState =
   | { type: 'task'; taskId?: string; projectId?: string | null }
-  | { type: 'note'; noteId?: string; projectId?: string | null }
+  | { type: 'note'; noteId?: string; projectId?: string | null; meetingId?: string | null }
   | { type: 'project'; projectId?: string }
   | { type: 'meeting'; meetingId?: string }
   | { type: 'person'; personId?: string }
@@ -410,12 +410,24 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
 function NoteSheet({ state, onClose }: { state: SheetState & { type: 'note' }; onClose: () => void }) {
   const store = useStore();
   const existing = state.noteId ? store.notes.find((n) => n.id === state.noteId) : undefined;
-  const [title, setTitle] = useState(existing?.title ?? '');
+  const meetingId = existing?.meetingId ?? state.meetingId ?? null;
+  const meeting = meetingId ? store.meetings.find((m) => m.id === meetingId) : undefined;
+
+  // A note started from a meeting inherits its attendees, and — only for the
+  // first note from that meeting — its title. Prefilling every time would give
+  // you a stack of identically-named notes.
+  const isFirstFromMeeting =
+    !!meeting && !store.notes.some((n) => n.meetingId === meeting.id);
+  const [title, setTitle] = useState(
+    existing?.title ?? (isFirstFromMeeting ? (meeting?.title ?? '') : ''),
+  );
   const [body, setBody] = useState(existing?.body ?? '');
   const [projectId, setProjectId] = useState<string | null>(
     existing?.projectId ?? state.projectId ?? null,
   );
-  const [personIds, setPersonIds] = useState<string[]>(existing?.personIds ?? []);
+  const [personIds, setPersonIds] = useState<string[]>(
+    existing?.personIds ?? meeting?.personIds ?? [],
+  );
 
   const save = async () => {
     if (!body.trim()) {
@@ -428,12 +440,31 @@ function NoteSheet({ state, onClose }: { state: SheetState & { type: 'note' }; o
       body: body.trim(),
       projectId,
       personIds,
+      meetingId,
     });
     onClose();
   };
 
   return (
     <>
+      {meeting && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: '9px 12px',
+            background: C.paper2,
+            borderRadius: 10,
+            fontSize: 12,
+            color: C.softInk,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <span style={{ color: C.muted }}>◷</span>
+          From <b style={{ color: C.ink }}>{meeting.title}</b>
+        </div>
+      )}
       <Field top={12}>
         <label style={label}>Title</label>
         <input
@@ -749,9 +780,13 @@ function ProjectSheet({
 function MeetingSheet({
   state,
   onClose,
+  onAddNote,
+  onOpenNote,
 }: {
   state: SheetState & { type: 'meeting' };
   onClose: () => void;
+  onAddNote: (meetingId: string) => void;
+  onOpenNote: (noteId: string) => void;
 }) {
   const store = useStore();
   const existing = state.meetingId
@@ -768,7 +803,60 @@ function MeetingSheet({
   const [personIds, setPersonIds] = useState<string[]>(existing?.personIds ?? []);
   const [peopleText, setPeopleText] = useState(existing?.peopleText ?? '');
   const [location, setLocation] = useState(existing?.location ?? '');
-  const [notes, setNotes] = useState(existing?.notes ?? '');
+
+  // Notes are ordinary Note records linked to this meeting, so they also show
+  // up in the Notes list and on each attendee's page.
+  const linkedNotes = existing
+    ? store.notes.filter((n) => n.meetingId === existing.id)
+    : [];
+
+  const notesSection = existing ? (
+    <Field top={18}>
+      <label style={label}>Notes</label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {linkedNotes.map((n) => (
+          <div
+            key={n.id}
+            onClick={() => onOpenNote(n.id)}
+            style={{
+              background: C.card,
+              border: `1px solid ${C.cardBorder}`,
+              borderRadius: 12,
+              padding: '12px 13px',
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{n.title}</div>
+            <div
+              style={{
+                fontSize: 12.5,
+                color: C.softInk,
+                lineHeight: 1.45,
+                marginTop: 4,
+                whiteSpace: 'pre-wrap',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {n.body}
+            </div>
+          </div>
+        ))}
+        <button onClick={() => onAddNote(existing.id)} style={dashedBtn}>
+          ＋ Add a note from this meeting
+        </button>
+      </div>
+      <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>
+        These appear in Notes alongside everything else.
+      </div>
+    </Field>
+  ) : (
+    <div style={{ fontSize: 11.5, color: C.muted, marginTop: 14, lineHeight: 1.5 }}>
+      Save the meeting first, then you can add notes to it.
+    </div>
+  );
 
   const save = async () => {
     const t = title.trim();
@@ -783,7 +871,6 @@ function MeetingSheet({
       personIds,
       peopleText,
       location,
-      notes,
     });
     onClose();
   };
@@ -806,24 +893,7 @@ function MeetingSheet({
         </div>
         {/* The event is read-only, but the notes are ours — most meetings will
             be synced ones, so notes have to work here too. */}
-        <Field top={16}>
-          <label style={label}>Notes</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="What was discussed, decisions, follow-ups…"
-            style={{ ...input, resize: 'none', minHeight: 100 }}
-          />
-        </Field>
-        <button
-          onClick={() => {
-            void store.updateMeetingNotes(existing.id, notes);
-            onClose();
-          }}
-          style={{ ...primaryBtn, marginTop: 18 }}
-        >
-          Save notes
-        </button>
+        {notesSection}
         <div
           style={{
             marginTop: 16,
@@ -890,15 +960,7 @@ function MeetingSheet({
           style={input}
         />
       </Field>
-      <Field>
-        <label style={label}>Notes</label>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="What was discussed, decisions, follow-ups…"
-          style={{ ...input, resize: 'none', minHeight: 100 }}
-        />
-      </Field>
+      {notesSection}
       <button onClick={() => void save()} style={{ ...primaryBtn, marginTop: 20 }}>
         {existing ? 'Update meeting' : 'Add meeting'}
       </button>
@@ -1075,10 +1137,12 @@ const TITLES: Record<string, string> = {
 export function Sheet({
   state,
   onClose,
+  onOpenSheet,
   wide,
 }: {
   state: SheetState;
   onClose: () => void;
+  onOpenSheet: (s: SheetState) => void;
   wide: boolean;
 }) {
   // Escape closes, and the sheet traps the page behind it.
@@ -1104,7 +1168,14 @@ export function Sheet({
       {state.type === 'task' && <TaskSheet state={state} onClose={onClose} />}
       {state.type === 'note' && <NoteSheet state={state} onClose={onClose} />}
       {state.type === 'project' && <ProjectSheet state={state} onClose={onClose} />}
-      {state.type === 'meeting' && <MeetingSheet state={state} onClose={onClose} />}
+      {state.type === 'meeting' && (
+        <MeetingSheet
+          state={state}
+          onClose={onClose}
+          onAddNote={(meetingId) => onOpenSheet({ type: 'note', meetingId })}
+          onOpenNote={(noteId) => onOpenSheet({ type: 'note', noteId })}
+        />
+      )}
       {state.type === 'person' && <PersonSheet state={state} onClose={onClose} />}
       {state.type === 'mini' && <MiniSheet state={state} onClose={onClose} />}
     </SheetShell>

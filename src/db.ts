@@ -62,6 +62,46 @@ class KaktusDB extends Dexie {
             if (m.accountId === undefined) m.accountId = null;
           });
       });
+
+    // v5 — meeting notes become ordinary Note records linked by meetingId, so
+    // they appear in the Notes list like every other note. The old free-text
+    // Meeting.notes is converted here and then dropped; nothing already written
+    // is lost.
+    this.version(5)
+      .stores({ notes: 'id, projectId, date, pinned, meetingId' })
+      .upgrade(async (tx) => {
+        const notes = tx.table<Note>('notes');
+        const meetings = tx.table<Meeting & { notes?: string }>('meetings');
+        const all = await meetings.toArray();
+        const now = new Date().toISOString();
+
+        for (const m of all) {
+          const text = typeof m.notes === 'string' ? m.notes.trim() : '';
+          if (text) {
+            await notes.add({
+              id: `note_${crypto.randomUUID().slice(0, 12)}`,
+              // The meeting's own title is the most useful thing to find it by.
+              title: m.title,
+              body: text,
+              projectId: null,
+              // Carry the meeting's attendees across, so the note already shows
+              // on those people's pages.
+              personIds: Array.isArray(m.personIds) ? [...m.personIds] : [],
+              meetingId: m.id,
+              date: m.datetime ? m.datetime.slice(0, 10) : now.slice(0, 10),
+              pinned: false,
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+        }
+        await meetings.toCollection().modify((m) => {
+          delete (m as Meeting & { notes?: string }).notes;
+        });
+        await notes.toCollection().modify((n) => {
+          if (n.meetingId === undefined) n.meetingId = null;
+        });
+      });
   }
 }
 

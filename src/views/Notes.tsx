@@ -7,7 +7,8 @@ import type { ViewProps } from './types';
 
 export function Notes({ openSheet, wide }: ViewProps) {
   const store = useStore();
-  const { notes, projects } = store;
+  const { notes, projects, meetings } = store;
+  const meetingOf = (id: string | null) => (id ? meetings.find((m) => m.id === id) : undefined);
   const [filter, setFilter] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string[]>([]);
   /** Which note bodies are actually clipped by the 2-line clamp. */
@@ -151,7 +152,16 @@ export function Notes({ openSheet, wide }: ViewProps) {
                   {isExpanded ? 'Show less' : 'Read more'}
                 </span>
               )}
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  rowGap: 6,
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  marginTop: 10,
+                }}
+              >
                 {project && (
                   <span
                     style={{
@@ -164,6 +174,23 @@ export function Notes({ openSheet, wide }: ViewProps) {
                     }}
                   >
                     {project.name}
+                  </span>
+                )}
+                {meetingOf(n.meetingId) && (
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 600,
+                      padding: '3px 8px',
+                      borderRadius: 20,
+                      background: C.paper2,
+                      color: C.clay,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    ◷ {meetingOf(n.meetingId)!.title}
                   </span>
                 )}
                 <span

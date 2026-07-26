@@ -9,8 +9,9 @@ import type { View, ViewProps } from './types';
 // ---------------- Meetings ----------------
 
 export function Meetings({ openSheet }: ViewProps) {
-  const { meetings } = useStore();
+  const { meetings, notes } = useStore();
   const accountEmail = useAccountEmail();
+  const notesFor = (meetingId: string) => notes.filter((n) => n.meetingId === meetingId);
   const sorted = [...meetings].sort((a, b) => a.datetime.localeCompare(b.datetime));
 
   return (
@@ -85,23 +86,33 @@ export function Meetings({ openSheet }: ViewProps) {
                   📍 {m.location}
                 </div>
               )}
-              {m.notes.trim() && (
+              {notesFor(m.id).length > 0 && (
                 <div
                   style={{
-                    fontSize: 12.5,
-                    color: C.softInk,
                     marginTop: 7,
                     paddingTop: 7,
                     borderTop: `1px solid ${C.line}`,
-                    lineHeight: 1.45,
-                    whiteSpace: 'pre-wrap',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
                   }}
                 >
-                  {m.notes}
+                  <div
+                    style={{
+                      fontSize: 12.5,
+                      color: C.softInk,
+                      lineHeight: 1.45,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {notesFor(m.id)[0].body}
+                  </div>
+                  {notesFor(m.id).length > 1 && (
+                    <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginTop: 4 }}>
+                      +{notesFor(m.id).length - 1} more{' '}
+                      {notesFor(m.id).length === 2 ? 'note' : 'notes'}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

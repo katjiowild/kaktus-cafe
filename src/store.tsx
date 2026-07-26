@@ -98,6 +98,7 @@ export interface Store extends Data {
     body: string;
     projectId: string | null;
     personIds: string[];
+    meetingId?: string | null;
   }) => Promise<void>;
   toggleNotePin: (id: string) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
@@ -109,10 +110,7 @@ export interface Store extends Data {
     personIds: string[];
     peopleText: string;
     location: string;
-    notes?: string;
   }) => Promise<void>;
-  /** Notes belong to us even when the event itself is a read-only synced one. */
-  updateMeetingNotes: (id: string, notes: string) => Promise<void>;
   deleteMeeting: (id: string) => Promise<void>;
 
   createPerson: (input: { name: string; role: string; howMet: string }) => Promise<void>;
@@ -552,10 +550,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       // ---------- Notes ----------
-      async saveNote({ id, title, body, projectId, personIds }) {
+      async saveNote({ id, title, body, projectId, personIds, meetingId }) {
         const now = isoNow();
         if (id) {
-          await db.notes.update(id, { title, body, projectId, personIds, updatedAt: now });
+          await db.notes.update(id, {
+            title,
+            body,
+            projectId,
+            personIds,
+            ...(meetingId === undefined ? {} : { meetingId }),
+            updatedAt: now,
+          });
         } else {
           await db.notes.add({
             id: uid('note'),
@@ -563,6 +568,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             body,
             projectId,
             personIds,
+            meetingId: meetingId ?? null,
             date: isoDate(),
             pinned: false,
             createdAt: now,
@@ -588,7 +594,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       // ---------- Meetings ----------
-      async saveMeeting({ id, title, datetime, personIds, peopleText, location, notes }) {
+      async saveMeeting({ id, title, datetime, personIds, peopleText, location }) {
         const now = isoNow();
         // Links come from the picker now (v5 §2) rather than being guessed by
         // name-matching free text. `peopleText` stays for attendees who aren't
@@ -600,7 +606,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             peopleText,
             personIds,
             location,
-            ...(notes === undefined ? {} : { notes }),
             updatedAt: now,
           });
         } else {
@@ -614,7 +619,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             source: 'local',
             externalId: null,
             accountId: null,
-            notes: notes ?? '',
             createdAt: now,
             updatedAt: now,
           });
@@ -623,16 +627,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         showToast(id ? 'Meeting updated' : 'Meeting added');
       },
 
-      async updateMeetingNotes(id, notes) {
-        await db.meetings.update(id, { notes, updatedAt: isoNow() });
-        await after();
-        showToast('Notes saved');
-      },
-
       async deleteMeeting(id) {
+        // Orphan the notes rather than cascade-delete: they're hers, and losing
+        // a write-up because the calendar entry went away would be worse than
+        // an unlinked note.
+        const linked = await db.notes.where('meetingId').equals(id).toArray();
+        await Promise.all(
+          linked.map((n) => db.notes.update(n.id, { meetingId: null, updatedAt: isoNow() })),
+        );
         await db.meetings.delete(id);
         await after();
-        showToast('Meeting deleted');
+        showToast(
+          linked.length
+            ? `Meeting deleted — ${linked.length} ${linked.length === 1 ? 'note' : 'notes'} kept`
+            : 'Meeting deleted',
+        );
       },
 
       // ---------- People ----------
