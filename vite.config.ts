@@ -29,6 +29,24 @@ export default defineConfig({
           { src: 'icons/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
           { src: 'icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+        // Long-press the home-screen icon → straight into the capture sheet,
+        // without loading Today first. `?new=` is read in App.tsx.
+        shortcuts: [
+          {
+            name: 'New Task',
+            short_name: 'Task',
+            description: 'Capture a task',
+            url: '?new=task',
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'New Meeting',
+            short_name: 'Meeting',
+            description: 'Add a meeting',
+            url: '?new=meeting',
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+        ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],

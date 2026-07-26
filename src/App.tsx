@@ -64,6 +64,20 @@ export function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const wide = useWide();
 
+  /**
+   * Home-screen shortcuts land here as `?new=task` / `?new=meeting` (v6 §1) —
+   * open that capture sheet straight away and tidy the URL, so a refresh or a
+   * later share doesn't reopen the sheet.
+   */
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const kind = url.searchParams.get('new');
+    if (kind !== 'task' && kind !== 'meeting') return;
+    setSheet(kind === 'task' ? { type: 'task' } : { type: 'meeting' });
+    url.searchParams.delete('new');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+  }, []);
+
   const go = (v: View) => {
     setView(v);
     setActiveProjectId(null);
