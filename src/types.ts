@@ -156,6 +156,8 @@ export interface CalendarAccount {
   /** Absolute epoch ms; refreshed quietly when past. */
   expiresAt: number;
   refreshToken: string | null;
+  /** Scopes Google actually granted. Absent on pre-v6 records = read-only. */
+  scopes?: string;
   /** ISO datetime of the last successful sync. */
   lastSyncedAt: string | null;
   /** Last sync failure, surfaced in Settings rather than swallowed. */

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { C, primaryBtn, SERIF } from '../tokens';
+import { C, input, label, primaryBtn, SERIF } from '../tokens';
 import { useStore } from '../store';
 import { clearAll } from '../db';
 import { shortDate } from '../lib/dates';
+import { canWrite } from '../lib/googleAuth';
 import {
   dataSummary,
   downloadBackup,
@@ -66,6 +67,8 @@ export function Settings() {
     borderRadius: 14,
     padding: 16,
   };
+
+  const writeCapable = store.accounts.filter((a) => a.provider === 'google' && canWrite(a.scopes));
 
   const summary = Object.entries(counts)
     .filter(([, n]) => n > 0)
@@ -202,9 +205,29 @@ export function Settings() {
                   ? a.lastError
                   : `${a.provider === 'google' ? 'Google' : 'Outlook'} · ${
                       a.lastSyncedAt ? `synced ${shortDate(a.lastSyncedAt)}` : 'not synced yet'
-                    }`}
+                    }${canWrite(a.scopes) ? ' · can add events' : ''}`}
               </div>
             </div>
+            {a.provider === 'google' && !canWrite(a.scopes) && (
+              <button
+                onClick={() => void store.grantCalendarWrite(a.id)}
+                title="Let the app add meetings to this calendar"
+                style={{
+                  flexShrink: 0,
+                  background: 'none',
+                  border: `1px solid ${C.line}`,
+                  borderRadius: 9,
+                  padding: '6px 10px',
+                  fontFamily: 'inherit',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: C.clay,
+                  cursor: 'pointer',
+                }}
+              >
+                Allow adding
+              </button>
+            )}
             <button
               onClick={() => void store.disconnectCalendar(a.id)}
               style={{
@@ -278,10 +301,34 @@ export function Settings() {
           </button>
         )}
 
+        {writeCapable.length > 1 && (
+          <div>
+            <label style={{ ...label, marginTop: 4 }}>Default calendar for new meetings</label>
+            <select
+              value={store.defaultWriteAccountId ?? ''}
+              onChange={(e) => void store.setDefaultWriteAccount(e.target.value || null)}
+              style={input}
+            >
+              {writeCapable.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.email}
+                </option>
+              ))}
+              <option value="">— Ask each time —</option>
+            </select>
+          </div>
+        )}
+
         <p style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>
           Synced events are read-only, but any notes you write on them stay yours. Disconnecting
           removes that account's events; your own meetings are untouched.
         </p>
+        {writeCapable.length > 0 && (
+          <p style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>
+            A meeting added to a calendar is written once, at the moment you create it, and then
+            belongs to that calendar — later changes need making there.
+          </p>
+        )}
       </div>
 
       <div style={h}>Data</div>
