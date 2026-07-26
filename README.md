@@ -54,9 +54,41 @@ Two rules the code is built around, both from the spec:
 
 Species follow project type: Active = echeveria, Retainer = aeonium, Area = dracaena.
 
+## Calendar sync (Phase 3)
+
+Read-only sync from Google and Outlook, entirely client-side — OAuth 2.0 Authorization Code with PKCE, no backend and no client secret. Connect accounts under **More → Backup & settings → Calendars**. Multiple accounts are supported (personal + work, either provider); each event is badged `GCAL` or `OUTLOOK` and names its account.
+
+Synced events are read-only — change the time, title or attendees in the calendar itself. **Notes you write on a synced meeting are yours and are never overwritten by a re-sync**, and a meeting you've written notes on is kept even if the organiser cancels it.
+
+### Before it will connect
+
+Both providers only accept sign-ins that come back to a **registered redirect URI**, which is the app's own URL including the trailing slash:
+
+```
+https://katjiowild.github.io/kaktus-cafe/
+```
+
+- **Google** — Cloud Console → Credentials → your OAuth client → *Authorised redirect URIs*. Keep the consent screen in **Testing** with yourself as the sole test user; that avoids the public-app verification process. Add `http://localhost:5173/kaktus-cafe/` too if you ever want sync to work while developing.
+- **Microsoft** — the registration already has a SPA redirect URI; make sure `Calendars.Read` (delegated) is granted under API permissions. The authority is `/common`, so personal Microsoft accounts work alongside work ones.
+
+> **One thing to watch on Google.** A browser app doing PKCE has to be a *public* client. If the OAuth client was created as a **Web application**, Google will demand a `client_secret` at the token step and sign-in will fail — the app detects exactly that and tells you so. The fix is to create an OAuth client of type **Desktop app** and use its Client ID. Microsoft has no such restriction.
+
+## Contacts import (Phase 3)
+
+**More → Backup & settings → Contacts → Import contacts** takes a JSON array of people. Only `name` is required:
+
+```json
+[
+  { "name": "Priya Nair", "role": "CITES focal point", "howMet": "CoP side event",
+    "followUp": true, "log": [{ "at": "2026-06-02T09:00:00Z", "text": "Discussed data sharing." }] },
+  { "name": "Tomas Berg" }
+]
+```
+
+Anyone whose name already exists is **skipped, not overwritten**, so re-running the same file never duplicates people or wipes an interaction log.
+
 ## What's not built yet
 
-- **Phase 3** — Google Calendar read-only sync (OAuth 2.0 + PKCE, client-side). The data model already has `source: 'local' | 'google'` and `externalId` on meetings, and the `GCAL` badge renders wherever a Google event appears, so this is an additive change.
-- **Phase 4** — v2 shared backend. The model is deliberately v2-shaped: flat collections, string ids, `createdAt`/`updatedAt` on every record, and owned children (subtasks, milestones, comments, log entries) each carry their own id so they lift into child tables without a rewrite.
+- **Phase 4** — a Supabase backend so Claude can read live data, cross-device sync, and voice capture. Not scoped yet. The model is deliberately v2-shaped: flat collections, string ids, `createdAt`/`updatedAt` on every record, and owned children (subtasks, milestones, comments, log entries) each carry their own id so they lift into child tables without a rewrite.
 
 
