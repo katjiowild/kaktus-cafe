@@ -17,6 +17,7 @@ import {
   upsertAccount,
 } from './lib/calendarSync';
 import { beginAuth, completeAuthIfReturning, emailFromIdToken, PROVIDERS } from './lib/oauth';
+import { fetchGoogleEmail, requestGoogleToken } from './lib/googleAuth';
 import type {
   Cadence,
   CalendarAccount,
@@ -686,7 +687,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       async connectCalendar(provider) {
         try {
-          // Navigates away; we pick the flow back up in the effect above.
+          if (provider === 'google') {
+            // Google uses a popup (GIS) rather than a redirect — its Web client
+            // can't complete PKCE from the browser. See lib/googleAuth.ts.
+            const token = await requestGoogleToken(true);
+            const email = (await fetchGoogleEmail(token.accessToken)) ?? 'Google account';
+            await upsertAccount(
+              newAccount({
+                provider: 'google',
+                email,
+                accessToken: token.accessToken,
+                refreshToken: null,
+                expiresAt: token.expiresAt,
+              }),
+            );
+            showToast(`Connected ${email}`);
+            setSyncing(true);
+            try {
+              const { errors } = await syncAll();
+              if (errors.length) showToast(errors[0]);
+            } finally {
+              setSyncing(false);
+            }
+            await after();
+            return;
+          }
+          // Outlook: redirect + PKCE, picked back up in the effect above.
           await beginAuth(PROVIDERS[provider]);
         } catch (e) {
           showToast(e instanceof Error ? e.message : 'Could not start sign-in.');
