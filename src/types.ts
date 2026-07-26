@@ -118,13 +118,6 @@ export interface Meeting {
   updatedAt: string;
 }
 
-export interface LogEntry {
-  id: string;
-  /** ISO datetime. */
-  at: string;
-  text: string;
-}
-
 export interface Person {
   id: string;
   name: string;
@@ -133,12 +126,13 @@ export interface Person {
   followUp: boolean;
   /** ISO date, optional — "reconnect around then". */
   followUpDate: string | null;
-  /** The interaction log is the core of this record's value (§3.6). */
-  log: LogEntry[];
   projectIds: string[];
   createdAt: string;
   updatedAt: string;
 }
+// The old per-person interaction log was folded into Notes: a note linked to a
+// person is the same thing, and it also shows up in Notes and can carry a
+// project or meeting. One place for each thing (§1).
 
 /** Small key/value bag: dismissed nudges, OAuth tokens, last-seen version. */
 export interface Setting {

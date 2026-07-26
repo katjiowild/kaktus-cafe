@@ -1,5 +1,5 @@
 import { db, uid } from '../db';
-import type { Backup, LogEntry, Person } from '../types';
+import type { Backup, Note, Person } from '../types';
 
 /**
  * v1 has no server, so this file is the only other copy of the data. It's also
@@ -128,6 +128,7 @@ export async function importContacts(text: string): Promise<ContactImportResult>
   const now = new Date().toISOString();
 
   const toAdd: Person[] = [];
+  const noteAdds: Note[] = [];
   const skipped: string[] = [];
 
   for (const raw of rows) {
@@ -142,24 +143,37 @@ export async function importContacts(text: string): Promise<ContactImportResult>
     }
     taken.add(key);
 
-    const log: LogEntry[] = Array.isArray(r.log)
-      ? (r.log as Record<string, unknown>[])
-          .filter((l) => typeof l?.text === 'string' && l.text.trim())
-          .map((l) => ({
-            id: uid('log'),
-            at: typeof l.at === 'string' ? l.at : now,
-            text: String(l.text).trim(),
-          }))
-      : [];
+    const personId = uid('person');
+
+    // A `log` array in the source file becomes notes linked to that person —
+    // the app no longer keeps a separate interaction log.
+    if (Array.isArray(r.log)) {
+      for (const l of r.log as Record<string, unknown>[]) {
+        const text = typeof l?.text === 'string' ? l.text.trim() : '';
+        if (!text) continue;
+        const at = typeof l.at === 'string' ? l.at : now;
+        noteAdds.push({
+          id: uid('note'),
+          title: `Conversation with ${name}`,
+          body: text,
+          projectId: null,
+          personIds: [personId],
+          meetingId: null,
+          date: at.slice(0, 10),
+          pinned: false,
+          createdAt: at,
+          updatedAt: now,
+        });
+      }
+    }
 
     toAdd.push({
-      id: uid('person'),
+      id: personId,
       name,
       role: typeof r.role === 'string' ? r.role : '',
       howMet: typeof r.howMet === 'string' ? r.howMet : '',
       followUp: r.followUp === true,
       followUpDate: typeof r.followUpDate === 'string' ? r.followUpDate : null,
-      log,
       // Project links are ids we can't resolve from an outside file; leave empty
       // rather than inventing references that point nowhere.
       projectIds: [],
@@ -169,6 +183,7 @@ export async function importContacts(text: string): Promise<ContactImportResult>
   }
 
   if (toAdd.length) await db.people.bulkAdd(toAdd);
+  if (noteAdds.length) await db.notes.bulkAdd(noteAdds);
   return { added: toAdd.length, skipped };
 }
 

@@ -102,6 +102,40 @@ class KaktusDB extends Dexie {
           if (n.meetingId === undefined) n.meetingId = null;
         });
       });
+
+    // v6 — the per-person interaction log folds into Notes. Each entry becomes
+    // a note linked to that person, keeping its original date, so the person's
+    // page reads the same while there's only one kind of written record.
+    this.version(6)
+      .stores({})
+      .upgrade(async (tx) => {
+        const notes = tx.table<Note>('notes');
+        const people = tx.table<Person & { log?: { at: string; text: string }[] }>('people');
+        const all = await people.toArray();
+        const now = new Date().toISOString();
+
+        for (const p of all) {
+          for (const entry of p.log ?? []) {
+            const text = typeof entry?.text === 'string' ? entry.text.trim() : '';
+            if (!text) continue;
+            await notes.add({
+              id: `note_${crypto.randomUUID().slice(0, 12)}`,
+              title: `Conversation with ${p.name}`,
+              body: text,
+              projectId: null,
+              personIds: [p.id],
+              meetingId: null,
+              date: (entry.at ?? now).slice(0, 10),
+              pinned: false,
+              createdAt: entry.at ?? now,
+              updatedAt: now,
+            });
+          }
+        }
+        await people.toCollection().modify((p) => {
+          delete (p as Person & { log?: unknown }).log;
+        });
+      });
   }
 }
 

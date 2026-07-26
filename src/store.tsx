@@ -115,7 +115,6 @@ export interface Store extends Data {
 
   createPerson: (input: { name: string; role: string; howMet: string }) => Promise<void>;
   updatePerson: (id: string, patch: Partial<Person>) => Promise<void>;
-  addLogEntry: (personId: string, text: string) => Promise<void>;
   deletePerson: (id: string) => Promise<void>;
 
   dismissNudge: (projectId: string) => Promise<void>;
@@ -654,7 +653,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           howMet,
           followUp: false,
           followUpDate: null,
-          log: [],
           projectIds: [],
           createdAt: now,
           updatedAt: now,
@@ -666,17 +664,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       async updatePerson(id, patch) {
         await db.people.update(id, { ...patch, updatedAt: isoNow() });
         await after();
-      },
-
-      async addLogEntry(personId, text) {
-        const p = await db.people.get(personId);
-        if (!p) return;
-        await db.people.update(personId, {
-          log: [{ id: uid('log'), at: isoNow(), text }, ...p.log],
-          updatedAt: isoNow(),
-        });
-        await after();
-        showToast('Logged');
       },
 
       async deletePerson(id) {

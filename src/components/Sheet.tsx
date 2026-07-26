@@ -8,13 +8,19 @@ import { PersonPicker } from './PersonPicker';
 
 export type SheetState =
   | { type: 'task'; taskId?: string; projectId?: string | null }
-  | { type: 'note'; noteId?: string; projectId?: string | null; meetingId?: string | null }
+  | {
+      type: 'note';
+      noteId?: string;
+      projectId?: string | null;
+      meetingId?: string | null;
+      personId?: string | null;
+    }
   | { type: 'project'; projectId?: string }
   | { type: 'meeting'; meetingId?: string }
   | { type: 'person'; personId?: string }
   | {
       type: 'mini';
-      kind: 'milestone' | 'comment' | 'ptask' | 'subtask' | 'log';
+      kind: 'milestone' | 'comment' | 'ptask' | 'subtask';
       ctx: string;
       title: string;
       label: string;
@@ -426,7 +432,7 @@ function NoteSheet({ state, onClose }: { state: SheetState & { type: 'note' }; o
     existing?.projectId ?? state.projectId ?? null,
   );
   const [personIds, setPersonIds] = useState<string[]>(
-    existing?.personIds ?? meeting?.personIds ?? [],
+    existing?.personIds ?? meeting?.personIds ?? (state.personId ? [state.personId] : []),
   );
 
   const save = async () => {
@@ -1085,9 +1091,6 @@ function MiniSheet({ state, onClose }: { state: SheetState & { type: 'mini' }; o
       case 'subtask':
         await store.addSubtask(state.ctx, v);
         break;
-      case 'log':
-        await store.addLogEntry(state.ctx, v);
-        break;
     }
     onClose();
   };
@@ -1096,7 +1099,7 @@ function MiniSheet({ state, onClose }: { state: SheetState & { type: 'mini' }; o
     <>
       <Field top={12}>
         <label style={label}>{state.label}</label>
-        {state.kind === 'comment' || state.kind === 'log' ? (
+        {state.kind === 'comment' ? (
           <textarea
             value={value}
             autoFocus
