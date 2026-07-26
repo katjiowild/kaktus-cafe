@@ -15,7 +15,26 @@
  */
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
-const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly openid email profile';
+
+/** What every connection asks for. Deliberately read-only. */
+const READ_SCOPES = 'https://www.googleapis.com/auth/calendar.readonly openid email profile';
+
+/**
+ * Writing events needs a wider scope, requested separately and only when she
+ * opts in (v6 §2). Bundling it into the base request would force every existing
+ * connection to re-consent, and a silent re-issue asking for a scope that was
+ * never granted fails — which would take read sync down with it.
+ */
+export const WRITE_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+const WRITE_SCOPES = `${READ_SCOPES} ${WRITE_SCOPE}`;
+
+/** Does this account's granted scope set allow creating events? */
+export function canWrite(scopes: string | undefined): boolean {
+  if (!scopes) return false;
+  return (
+    scopes.includes(WRITE_SCOPE) || scopes.includes('https://www.googleapis.com/auth/calendar ')
+  );
+}
 
 export const GOOGLE_CLIENT_ID =
   '392933221143-qnv7g5kkf3kcb1cvn024124a8aego03d.apps.googleusercontent.com';
@@ -23,6 +42,8 @@ export const GOOGLE_CLIENT_ID =
 interface TokenResponse {
   access_token?: string;
   expires_in?: number;
+  /** Space-separated list of what Google actually granted. */
+  scope?: string;
   error?: string;
   error_description?: string;
 }
@@ -38,6 +59,7 @@ interface GoogleGlobal {
         client_id: string;
         scope: string;
         prompt?: string;
+        hint?: string;
         callback: (r: TokenResponse) => void;
         error_callback?: (e: { type?: string; message?: string }) => void;
       }) => TokenClient;
@@ -77,6 +99,8 @@ function loadGis(): Promise<void> {
 export interface GoogleToken {
   accessToken: string;
   expiresAt: number;
+  /** What was granted — not necessarily what was asked for. */
+  scopes: string;
 }
 
 /**
@@ -86,7 +110,10 @@ export interface GoogleToken {
  * a silent re-issue, which succeeds whenever the Google session is still alive —
  * that's what stands in for a refresh token.
  */
-export function requestGoogleToken(interactive: boolean): Promise<GoogleToken> {
+export function requestGoogleToken(
+  interactive: boolean,
+  opts: { write?: boolean; hint?: string } = {},
+): Promise<GoogleToken> {
   return loadGis().then(
     () =>
       new Promise<GoogleToken>((resolve, reject) => {
@@ -99,7 +126,7 @@ export function requestGoogleToken(interactive: boolean): Promise<GoogleToken> {
         let settled = false;
         const client = oauth2.initTokenClient({
           client_id: GOOGLE_CLIENT_ID,
-          scope: SCOPES,
+          scope: opts.write ? WRITE_SCOPES : READ_SCOPES,
           callback: (r) => {
             if (settled) return;
             settled = true;
@@ -117,6 +144,7 @@ export function requestGoogleToken(interactive: boolean): Promise<GoogleToken> {
             resolve({
               accessToken: r.access_token,
               expiresAt: Date.now() + Number(r.expires_in ?? 3600) * 1000,
+              scopes: r.scope ?? (opts.write ? WRITE_SCOPES : READ_SCOPES),
             });
           },
           error_callback: (e) => {
@@ -137,7 +165,10 @@ export function requestGoogleToken(interactive: boolean): Promise<GoogleToken> {
 
         // '' asks Google to reissue without prompting; 'select_account' lets her
         // choose which account (and add a second one later).
-        client.requestAccessToken({ prompt: interactive ? 'select_account' : '' });
+        client.requestAccessToken({
+          prompt: interactive ? 'select_account' : '',
+          ...(opts.hint ? { hint: opts.hint } : {}),
+        });
       }),
   );
 }

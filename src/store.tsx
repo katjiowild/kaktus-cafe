@@ -10,14 +10,18 @@ import {
 import { db, getSetting, setSetting, uid } from './db';
 import { isoDate, isoNow, nextOccurrence, parseDate, today } from './lib/dates';
 import {
+  createGoogleEvent,
   disconnectAccount,
+  getDefaultWriteAccountId,
   loadAccounts,
   newAccount,
+  saveAccounts,
+  setDefaultWriteAccountId,
   syncAll,
   upsertAccount,
 } from './lib/calendarSync';
 import { beginAuth, completeAuthIfReturning, emailFromIdToken, PROVIDERS } from './lib/oauth';
-import { fetchGoogleEmail, requestGoogleToken } from './lib/googleAuth';
+import { canWrite, fetchGoogleEmail, requestGoogleToken } from './lib/googleAuth';
 import type {
   Cadence,
   CalendarAccount,
@@ -40,6 +44,7 @@ interface Data {
   people: Person[];
   dismissed: string[];
   accounts: CalendarAccount[];
+  defaultWriteAccountId: string | null;
 }
 
 const EMPTY: Data = {
@@ -50,6 +55,7 @@ const EMPTY: Data = {
   people: [],
   dismissed: [],
   accounts: [],
+  defaultWriteAccountId: null,
 };
 
 export interface Store extends Data {
@@ -111,6 +117,8 @@ export interface Store extends Data {
     personIds: string[];
     peopleText: string;
     location: string;
+    /** New meetings only: push to this Google account's primary calendar. */
+    pushTo?: string | null;
   }) => Promise<void>;
   deleteMeeting: (id: string) => Promise<void>;
 
@@ -126,6 +134,10 @@ export interface Store extends Data {
   connectCalendar: (provider: CalendarProvider) => Promise<void>;
   disconnectCalendar: (accountId: string) => Promise<void>;
   syncCalendars: () => Promise<void>;
+  /** Ask Google for the extra "add events" permission on one account (v6 §2). */
+  grantCalendarWrite: (accountId: string) => Promise<void>;
+  defaultWriteAccountId: string | null;
+  setDefaultWriteAccount: (accountId: string | null) => Promise<void>;
 }
 
 const StoreContext = createContext<Store | null>(null);
@@ -194,7 +206,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       getSetting<string[]>('dismissedNudges', []),
       loadAccounts(),
     ]);
-    setData({ projects, tasks, notes, meetings, people, dismissed, accounts });
+    const defaultWriteAccountId = await getDefaultWriteAccountId();
+    setData({
+      projects, tasks, notes, meetings, people, dismissed, accounts, defaultWriteAccountId,
+    });
   }, []);
 
   useEffect(() => {
@@ -594,7 +609,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       // ---------- Meetings ----------
-      async saveMeeting({ id, title, datetime, personIds, peopleText, location }) {
+      async saveMeeting({ id, title, datetime, personIds, peopleText, location, pushTo }) {
         const now = isoNow();
         // Links come from the picker now (v5 §2) rather than being guessed by
         // name-matching free text. `peopleText` stays for attendees who aren't
@@ -608,23 +623,65 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             location,
             updatedAt: now,
           });
-        } else {
-          await db.meetings.add({
-            id: uid('mtg'),
+          await after();
+          showToast('Meeting updated');
+          return;
+        }
+
+        const meetingId = uid('mtg');
+        await db.meetings.add({
+          id: meetingId,
+          title,
+          datetime,
+          personIds,
+          peopleText,
+          location,
+          source: 'local',
+          externalId: null,
+          accountId: null,
+          createdAt: now,
+          updatedAt: now,
+        });
+        await after();
+
+        if (!pushTo) {
+          showToast('Meeting added');
+          return;
+        }
+
+        // Push to Google (v6 §2). The meeting is already saved locally, so a
+        // failure here costs the reminder, never the record.
+        const account = (await loadAccounts()).find((a) => a.id === pushTo);
+        if (!account) {
+          showToast('Meeting added — that calendar account is no longer connected');
+          return;
+        }
+        try {
+          const { externalId } = await createGoogleEvent(account, {
             title,
             datetime,
-            personIds,
-            peopleText,
             location,
-            source: 'local',
-            externalId: null,
-            accountId: null,
-            createdAt: now,
-            updatedAt: now,
+            peopleText,
           });
+          // Adopt it as the account's event. Without this the next sync would
+          // pull the same event back in as a second, duplicate meeting — and
+          // because the app never pushes edits, letting it stay locally
+          // editable would mean in-app changes silently disagreeing with the
+          // reminder Google is holding.
+          await db.meetings.update(meetingId, {
+            source: 'google',
+            externalId,
+            accountId: account.id,
+            updatedAt: isoNow(),
+          });
+          await after();
+          showToast(`Added to ${account.email}`);
+        } catch (e) {
+          await after();
+          showToast(
+            e instanceof Error ? `Saved, but not added to Google — ${e.message}` : 'Saved locally',
+          );
         }
-        await after();
-        showToast(id ? 'Meeting updated' : 'Meeting added');
       },
 
       async deleteMeeting(id) {
@@ -699,6 +756,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 accessToken: token.accessToken,
                 refreshToken: null,
                 expiresAt: token.expiresAt,
+                scopes: token.scopes,
               }),
             );
             showToast(`Connected ${email}`);
@@ -717,6 +775,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         } catch (e) {
           showToast(e instanceof Error ? e.message : 'Could not start sign-in.');
         }
+      },
+
+      async grantCalendarWrite(accountId) {
+        const account = (await loadAccounts()).find((a) => a.id === accountId);
+        if (!account || account.provider !== 'google') return;
+        try {
+          // Incremental consent: same account, wider scope. `hint` keeps Google
+          // on the right mailbox instead of asking her to pick again.
+          const token = await requestGoogleToken(true, { write: true, hint: account.email });
+          if (!canWrite(token.scopes)) {
+            showToast("Google didn't grant permission to add events.");
+            return;
+          }
+          const accounts = await loadAccounts();
+          await saveAccounts(
+            accounts.map((a) =>
+              a.id === accountId
+                ? {
+                    ...a,
+                    accessToken: token.accessToken,
+                    expiresAt: token.expiresAt,
+                    scopes: token.scopes,
+                    lastError: null,
+                  }
+                : a,
+            ),
+          );
+          // First account that can write becomes the default, so the meeting
+          // sheet has a sensible answer without her setting one.
+          if (!(await getDefaultWriteAccountId())) await setDefaultWriteAccountId(accountId);
+          await after();
+          showToast(`${account.email} can now add events`);
+        } catch (e) {
+          showToast(e instanceof Error ? e.message : 'Could not get permission.');
+        }
+      },
+
+      async setDefaultWriteAccount(accountId) {
+        await setDefaultWriteAccountId(accountId);
+        await after();
       },
 
       async disconnectCalendar(accountId) {

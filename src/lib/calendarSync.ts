@@ -1,7 +1,7 @@
 import { db, uid } from '../db';
 import { isoNow } from './dates';
 import { OAuthError, PROVIDERS, refresh } from './oauth';
-import { requestGoogleToken } from './googleAuth';
+import { canWrite, requestGoogleToken } from './googleAuth';
 import type { CalendarAccount, Meeting, Person } from '../types';
 
 /**
@@ -61,7 +61,13 @@ async function freshToken(account: CalendarAccount): Promise<string> {
     await saveAccounts(
       accounts.map((a) =>
         a.id === account.id
-          ? { ...a, accessToken: token.accessToken, expiresAt: token.expiresAt }
+          ? {
+              ...a,
+              accessToken: token.accessToken,
+              expiresAt: token.expiresAt,
+              // Keep whatever was already granted if Google doesn't restate it.
+              scopes: token.scopes || a.scopes,
+            }
           : a,
       ),
     );
@@ -299,12 +305,78 @@ export async function syncAll(): Promise<{ result: SyncResult; errors: string[] 
   return { result: total, errors };
 }
 
+export const DEFAULT_WRITE_ACCOUNT_KEY = 'defaultCalendarAccountId';
+
+export async function getDefaultWriteAccountId(): Promise<string | null> {
+  const row = await db.settings.get(DEFAULT_WRITE_ACCOUNT_KEY);
+  return (row?.value as string | null | undefined) ?? null;
+}
+
+export async function setDefaultWriteAccountId(id: string | null): Promise<void> {
+  await db.settings.put({ key: DEFAULT_WRITE_ACCOUNT_KEY, value: id });
+}
+
+/**
+ * Push a meeting to Google as a real event (v6 §2), so the phone's own calendar
+ * handles the reminder. Always the account's **primary** calendar — she has no
+ * sub-calendars, so there's nothing to choose between.
+ *
+ * Create-time only: this never runs again for the same meeting, and the app
+ * never pushes edits. To keep that honest, the meeting is adopted as the
+ * account's event afterwards (see store.saveMeeting) — otherwise a later
+ * in-app edit would silently disagree with the reminder Google is holding.
+ */
+export async function createGoogleEvent(
+  account: CalendarAccount,
+  meeting: { title: string; datetime: string; location: string; peopleText: string },
+): Promise<{ externalId: string }> {
+  if (!canWrite(account.scopes)) {
+    throw new OAuthError(
+      `${account.email} hasn't been given permission to add events — enable it in Settings.`,
+    );
+  }
+  const token = await freshToken(account);
+  const start = new Date(meeting.datetime);
+  // No duration in the app's model; an hour is the least surprising default.
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  const res = await fetch(
+    'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        summary: meeting.title,
+        location: meeting.location || undefined,
+        description: meeting.peopleText ? `With ${meeting.peopleText}` : undefined,
+        start: { dateTime: start.toISOString(), timeZone },
+        end: { dateTime: end.toISOString(), timeZone },
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+    if (res.status === 401 || res.status === 403) {
+      throw new OAuthError(
+        `Google wouldn't accept the event for ${account.email} — re-enable "add events" in Settings.`,
+      );
+    }
+    throw new OAuthError(body.error?.message ?? `Google returned ${res.status}.`);
+  }
+  const json = (await res.json()) as { id?: string };
+  if (!json.id) throw new OAuthError('Google accepted the event but returned no id.');
+  return { externalId: json.id };
+}
+
 export function newAccount(input: {
   provider: CalendarAccount['provider'];
   email: string;
   accessToken: string;
   refreshToken: string | null;
   expiresAt: number;
+  scopes?: string;
 }): CalendarAccount {
   return {
     id: uid('acct'),

@@ -5,6 +5,7 @@ import { isoDate, WEEKDAY_LETTERS } from '../lib/dates';
 import type { Cadence, ProjectType, Recurrence } from '../types';
 import { Checkbox, ToggleRow } from './ui';
 import { PersonPicker } from './PersonPicker';
+import { canWrite } from '../lib/googleAuth';
 
 export type SheetState =
   | { type: 'task'; taskId?: string; projectId?: string | null }
@@ -810,6 +811,16 @@ function MeetingSheet({
   const [peopleText, setPeopleText] = useState(existing?.peopleText ?? '');
   const [location, setLocation] = useState(existing?.location ?? '');
 
+  // Which Google account (if any) gets a real calendar event — new meetings
+  // only, since the app pushes once at create time and never syncs edits back.
+  const writeAccounts = store.accounts.filter((a) => a.provider === 'google' && canWrite(a.scopes));
+  const [pushTo, setPushTo] = useState<string | null>(() => {
+    if (existing) return null;
+    const preferred = store.defaultWriteAccountId;
+    if (preferred && writeAccounts.some((a) => a.id === preferred)) return preferred;
+    return writeAccounts[0]?.id ?? null;
+  });
+
   // Notes are ordinary Note records linked to this meeting, so they also show
   // up in the Notes list and on each attendee's page.
   const linkedNotes = existing
@@ -877,6 +888,7 @@ function MeetingSheet({
       personIds,
       peopleText,
       location,
+      pushTo: existing ? null : pushTo,
     });
     onClose();
   };
@@ -966,6 +978,28 @@ function MeetingSheet({
           style={input}
         />
       </Field>
+      {!existing && writeAccounts.length > 0 && (
+        <Field>
+          <label style={label}>Add to calendar</label>
+          <select
+            value={pushTo ?? ''}
+            onChange={(e) => setPushTo(e.target.value || null)}
+            style={input}
+          >
+            {writeAccounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.email}
+              </option>
+            ))}
+            <option value="">— Don't add —</option>
+          </select>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 5, lineHeight: 1.5 }}>
+            Creates a real event so your phone handles the reminder. It's written once — later
+            changes need making in the calendar itself.
+          </div>
+        </Field>
+      )}
+
       {notesSection}
       <button onClick={() => void save()} style={{ ...primaryBtn, marginTop: 20 }}>
         {existing ? 'Update meeting' : 'Add meeting'}
