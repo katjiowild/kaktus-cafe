@@ -179,22 +179,36 @@ export function UrgentFlag() {
   );
 }
 
-export function GCalBadge() {
+/**
+ * Which calendar an event came from (v5 §3–4). Google and Outlook get distinct
+ * labels and tints; `title` carries the account email so overlapping calendars
+ * are still tellable apart on a long press / hover.
+ */
+export function SourceBadge({
+  source,
+  account,
+}: {
+  source: 'local' | 'google' | 'outlook';
+  account?: string;
+}) {
+  if (source === 'local') return null;
+  const isGoogle = source === 'google';
   return (
     <span
+      title={account ? `${isGoogle ? 'Google' : 'Outlook'} · ${account}` : undefined}
       style={{
         flexShrink: 0,
         fontSize: 10,
         fontWeight: 700,
         letterSpacing: '.04em',
-        color: C.softInk,
-        background: C.paper2,
-        border: `1px solid ${C.line}`,
+        color: isGoogle ? C.softInk : '#3f5876',
+        background: isGoogle ? C.paper2 : '#e6ecf3',
+        border: `1px solid ${isGoogle ? C.line : '#cbd8e6'}`,
         padding: '3px 7px',
         borderRadius: 6,
       }}
     >
-      GCAL
+      {isGoogle ? 'GCAL' : 'OUTLOOK'}
     </span>
   );
 }

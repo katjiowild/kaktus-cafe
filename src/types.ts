@@ -105,10 +105,12 @@ export interface Meeting {
   /** Attendees who aren't (yet) Person records — kept as typed. */
   peopleText: string;
   location: string;
-  /** Google events are read-only and badged GCAL (§4). */
-  source: 'local' | 'google';
-  /** Google's event id, so a re-sync updates rather than duplicates. */
+  /** Synced events are read-only and badged with their provider (§4, v5 §3–4). */
+  source: 'local' | 'google' | 'outlook';
+  /** The provider's event id, so a re-sync updates rather than duplicates. */
   externalId: string | null;
+  /** Which connected account this came from — null for local meetings (v5 §3). */
+  accountId: string | null;
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -136,10 +138,32 @@ export interface Person {
   updatedAt: string;
 }
 
-/** Small key/value bag: dismissed nudges, Google tokens, last-seen version. */
+/** Small key/value bag: dismissed nudges, OAuth tokens, last-seen version. */
 export interface Setting {
   key: string;
   value: unknown;
+}
+
+export type CalendarProvider = 'google' | 'outlook';
+
+/**
+ * One connected calendar account (v5 §3–4). Multiple accounts per provider are
+ * supported — personal + work — each with its own tokens, so revoking or
+ * re-authorising one never disturbs another.
+ */
+export interface CalendarAccount {
+  id: string;
+  provider: CalendarProvider;
+  /** The account's own email, shown in Settings and on the meeting badge. */
+  email: string;
+  accessToken: string;
+  /** Absolute epoch ms; refreshed quietly when past. */
+  expiresAt: number;
+  refreshToken: string | null;
+  /** ISO datetime of the last successful sync. */
+  lastSyncedAt: string | null;
+  /** Last sync failure, surfaced in Settings rather than swallowed. */
+  lastError: string | null;
 }
 
 export interface Backup {

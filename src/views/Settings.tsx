@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { C, primaryBtn, SERIF } from '../tokens';
 import { useStore } from '../store';
 import { clearAll } from '../db';
+import { shortDate } from '../lib/dates';
 import { dataSummary, downloadBackup, ImportError, importBackup } from '../lib/backup';
 
 export function Settings() {
@@ -93,15 +94,122 @@ export function Settings() {
         </p>
       </div>
 
-      <div style={h}>Connections</div>
+      <div style={h}>Calendars</div>
       <div style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.line }} />
-          <span style={{ fontSize: 14, fontWeight: 600 }}>Google Calendar</span>
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: C.muted }}>Not connected</span>
+        {store.accounts.length === 0 && (
+          <p style={{ fontSize: 13.5, color: C.softInk, lineHeight: 1.55 }}>
+            Connect a calendar to see your events in Today, Calendar and Meetings. Sync is
+            read-only — the app never changes anything in your calendar. You can connect more than
+            one account.
+          </p>
+        )}
+
+        {store.accounts.map((a) => (
+          <div
+            key={a.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              paddingBottom: 12,
+              borderBottom: `1px solid ${C.paper2}`,
+            }}
+          >
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: a.lastError ? C.overdue : '#4a6b52',
+                flexShrink: 0,
+              }}
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>{a.email}</div>
+              <div style={{ fontSize: 11.5, color: a.lastError ? C.overdue : C.muted, marginTop: 2 }}>
+                {a.lastError
+                  ? a.lastError
+                  : `${a.provider === 'google' ? 'Google' : 'Outlook'} · ${
+                      a.lastSyncedAt ? `synced ${shortDate(a.lastSyncedAt)}` : 'not synced yet'
+                    }`}
+              </div>
+            </div>
+            <button
+              onClick={() => void store.disconnectCalendar(a.id)}
+              style={{
+                flexShrink: 0,
+                background: 'none',
+                border: `1px solid ${C.line}`,
+                borderRadius: 9,
+                padding: '6px 10px',
+                fontFamily: 'inherit',
+                fontSize: 12,
+                fontWeight: 600,
+                color: C.softInk,
+                cursor: 'pointer',
+              }}
+            >
+              Disconnect
+            </button>
+          </div>
+        ))}
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => void store.connectCalendar('google')}
+            style={{
+              flex: 1,
+              background: C.card,
+              color: C.softInk,
+              border: `1px solid ${C.line}`,
+              borderRadius: 12,
+              padding: 12,
+              fontFamily: 'inherit',
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            ＋ Google
+          </button>
+          <button
+            onClick={() => void store.connectCalendar('outlook')}
+            style={{
+              flex: 1,
+              background: C.card,
+              color: C.softInk,
+              border: `1px solid ${C.line}`,
+              borderRadius: 12,
+              padding: 12,
+              fontFamily: 'inherit',
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            ＋ Outlook
+          </button>
         </div>
-        <p style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
-          Read-only calendar sync is the next thing to land. The app works fully without it.
+
+        {store.accounts.length > 0 && (
+          <button
+            onClick={() => void store.syncCalendars()}
+            disabled={store.syncing}
+            style={{
+              ...primaryBtn,
+              padding: 13,
+              fontSize: 15,
+              opacity: store.syncing ? 0.6 : 1,
+              cursor: store.syncing ? 'default' : 'pointer',
+            }}
+          >
+            {store.syncing ? 'Syncing…' : 'Sync now'}
+          </button>
+        )}
+
+        <p style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>
+          Synced events are read-only, but any notes you write on them stay yours. Disconnecting
+          removes that account's events; your own meetings are untouched.
         </p>
       </div>
 

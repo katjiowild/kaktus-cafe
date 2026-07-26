@@ -1,15 +1,16 @@
 import { C, SERIF } from '../tokens';
-import { useStore } from '../store';
+import { useAccountEmail, useStore } from '../store';
 import { isoDate, timeLabel } from '../lib/dates';
 import { projectMeta, sortOpenTasks } from '../lib/derive';
 import { Garden } from '../components/Garden';
 import { Plant } from '../components/Plant';
 import { TaskRow } from '../components/TaskRow';
-import { Card, EmptyState, GCalBadge } from '../components/ui';
+import { Card, EmptyState, SourceBadge } from '../components/ui';
 import type { ViewProps } from './types';
 
 export function Today({ openProject, openSheet }: ViewProps) {
   const store = useStore();
+  const accountEmail = useAccountEmail();
   const { projects, tasks, meetings, notes, dismissed } = store;
   const todayIso = isoDate();
 
@@ -155,7 +156,7 @@ export function Today({ openProject, openSheet }: ViewProps) {
                 </div>
               )}
             </div>
-            {m.source === 'google' && <GCalBadge />}
+            <SourceBadge source={m.source} account={accountEmail(m.accountId)} />
           </Card>
         ))}
         {todayMeetings.length === 0 && (

@@ -49,6 +49,19 @@ class KaktusDB extends Dexie {
             if (!Array.isArray(n.personIds)) n.personIds = [];
           });
       });
+
+    // v4 — Meeting.accountId (v5 §3), indexed because sync looks meetings up by
+    // account on every run.
+    this.version(4)
+      .stores({ meetings: 'id, datetime, source, externalId, accountId' })
+      .upgrade(async (tx) => {
+        await tx
+          .table<Meeting>('meetings')
+          .toCollection()
+          .modify((m) => {
+            if (m.accountId === undefined) m.accountId = null;
+          });
+      });
   }
 }
 

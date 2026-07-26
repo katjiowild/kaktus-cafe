@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { C, SERIF } from '../tokens';
-import { useStore } from '../store';
+import { useAccountEmail, useStore } from '../store';
 import { isoDate, timeLabel } from '../lib/dates';
-import { GCalBadge } from '../components/ui';
+import { SourceBadge } from '../components/ui';
 import type { ViewProps } from './types';
 
 const DOWS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 export function Calendar({ wide, openSheet }: ViewProps) {
   const { tasks, meetings } = useStore();
+  const accountEmail = useAccountEmail();
   const [cursor, setCursor] = useState(() => {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
@@ -189,7 +190,7 @@ export function Calendar({ wide, openSheet }: ViewProps) {
                 }}
               />
               <span style={{ flex: 1, fontSize: 14 }}>{m.title}</span>
-              {m.source === 'google' && <GCalBadge />}
+              <SourceBadge source={m.source} account={accountEmail(m.accountId)} />
               <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 600 }}>
                 {timeLabel(m.datetime)}
               </span>

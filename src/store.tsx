@@ -9,8 +9,18 @@ import {
 } from 'react';
 import { db, getSetting, setSetting, uid } from './db';
 import { isoDate, isoNow, nextOccurrence, parseDate, today } from './lib/dates';
+import {
+  disconnectAccount,
+  loadAccounts,
+  newAccount,
+  syncAll,
+  upsertAccount,
+} from './lib/calendarSync';
+import { beginAuth, completeAuthIfReturning, emailFromIdToken, PROVIDERS } from './lib/oauth';
 import type {
   Cadence,
+  CalendarAccount,
+  CalendarProvider,
   Meeting,
   Note,
   Person,
@@ -28,6 +38,7 @@ interface Data {
   meetings: Meeting[];
   people: Person[];
   dismissed: string[];
+  accounts: CalendarAccount[];
 }
 
 const EMPTY: Data = {
@@ -37,6 +48,7 @@ const EMPTY: Data = {
   meetings: [],
   people: [],
   dismissed: [],
+  accounts: [],
 };
 
 export interface Store extends Data {
@@ -109,6 +121,13 @@ export interface Store extends Data {
   deletePerson: (id: string) => Promise<void>;
 
   dismissNudge: (projectId: string) => Promise<void>;
+
+  // ---------- Calendar sync (v5 §3–4) ----------
+  accounts: CalendarAccount[];
+  syncing: boolean;
+  connectCalendar: (provider: CalendarProvider) => Promise<void>;
+  disconnectCalendar: (accountId: string) => Promise<void>;
+  syncCalendars: () => Promise<void>;
 }
 
 const StoreContext = createContext<Store | null>(null);
@@ -165,24 +184,52 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => setToast((t) => (t === msg ? '' : t)), 2200);
   }, []);
 
+  const [syncing, setSyncing] = useState(false);
+
   const reload = useCallback(async () => {
-    const [projects, tasks, notes, meetings, people, dismissed] = await Promise.all([
+    const [projects, tasks, notes, meetings, people, dismissed, accounts] = await Promise.all([
       db.projects.toArray(),
       db.tasks.toArray(),
       db.notes.toArray(),
       db.meetings.toArray(),
       db.people.toArray(),
       getSetting<string[]>('dismissedNudges', []),
+      loadAccounts(),
     ]);
-    setData({ projects, tasks, notes, meetings, people, dismissed });
+    setData({ projects, tasks, notes, meetings, people, dismissed, accounts });
   }, []);
 
   useEffect(() => {
     void (async () => {
+      // If we've just come back from a provider's consent screen, finish the
+      // handshake before the first render so the account is already there.
+      try {
+        const done = await completeAuthIfReturning();
+        if (done) {
+          const email =
+            emailFromIdToken(done.idToken) ?? `${PROVIDERS[done.provider].label} account`;
+          await upsertAccount(
+            newAccount({
+              provider: done.provider,
+              email,
+              accessToken: done.accessToken,
+              refreshToken: done.refreshToken,
+              expiresAt: done.expiresAt,
+            }),
+          );
+          showToast(`Connected ${email}`);
+          setSyncing(true);
+          const { errors } = await syncAll();
+          setSyncing(false);
+          if (errors.length) showToast(errors[0]);
+        }
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : 'Sign-in failed.');
+      }
       await reload();
       setReady(true);
     })();
-  }, [reload]);
+  }, [reload, showToast]);
 
   /**
    * Stamp a project as touched. Any completed task, new note, milestone change
@@ -566,6 +613,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             location,
             source: 'local',
             externalId: null,
+            accountId: null,
             notes: notes ?? '',
             createdAt: now,
             updatedAt: now,
@@ -636,8 +684,48 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
         await after();
       },
+
+      // ---------- Calendar sync ----------
+      syncing,
+
+      async connectCalendar(provider) {
+        try {
+          // Navigates away; we pick the flow back up in the effect above.
+          await beginAuth(PROVIDERS[provider]);
+        } catch (e) {
+          showToast(e instanceof Error ? e.message : 'Could not start sign-in.');
+        }
+      },
+
+      async disconnectCalendar(accountId) {
+        await disconnectAccount(accountId);
+        await after();
+        showToast('Account disconnected');
+      },
+
+      async syncCalendars() {
+        setSyncing(true);
+        try {
+          const { result, errors } = await syncAll();
+          await after();
+          if (errors.length) {
+            showToast(errors[0]);
+          } else if (result.added || result.updated || result.removed) {
+            const bits = [
+              result.added && `${result.added} new`,
+              result.updated && `${result.updated} updated`,
+              result.removed && `${result.removed} removed`,
+            ].filter(Boolean);
+            showToast(`Calendar synced — ${bits.join(', ')}`);
+          } else {
+            showToast('Calendar up to date');
+          }
+        } finally {
+          setSyncing(false);
+        }
+      },
     };
-  }, [data, ready, toast, showToast, reload, touchProject]);
+  }, [data, ready, toast, syncing, showToast, reload, touchProject]);
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;
 }
@@ -646,4 +734,10 @@ export function useStore(): Store {
   const s = useContext(StoreContext);
   if (!s) throw new Error('useStore must be used inside <StoreProvider>');
   return s;
+}
+
+/** Maps a meeting's accountId to the email shown on its provider badge. */
+export function useAccountEmail(): (accountId: string | null) => string | undefined {
+  const { accounts } = useStore();
+  return (accountId) => accounts.find((a) => a.id === accountId)?.email;
 }
