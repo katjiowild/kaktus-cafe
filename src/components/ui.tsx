@@ -93,6 +93,92 @@ export function OverdueFlag() {
   );
 }
 
+/** Labelled switch row, matching the note-pin toggle already in the sheets. */
+export function ToggleRow({
+  icon,
+  label,
+  on,
+  onToggle,
+}: {
+  icon: ReactNode;
+  label: string;
+  on: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      role="switch"
+      aria-checked={on}
+      tabIndex={0}
+      onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        cursor: 'pointer',
+        background: C.card,
+        border: `1px solid ${C.cardBorder}`,
+        borderRadius: 12,
+        padding: '12px 14px',
+      }}
+    >
+      <span style={{ fontSize: 15 }}>{icon}</span>
+      <span style={{ fontSize: 14, fontWeight: 600, flex: 1, color: C.ink }}>{label}</span>
+      <span
+        style={{
+          width: 40,
+          height: 24,
+          borderRadius: 12,
+          background: on ? C.sage : '#d8d0bf',
+          padding: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: on ? 'flex-end' : 'flex-start',
+          transition: 'all .18s ease',
+          flexShrink: 0,
+        }}
+      >
+        <span
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: '50%',
+            background: '#fff',
+            boxShadow: '0 1px 2px rgba(0,0,0,.2)',
+          }}
+        />
+      </span>
+    </div>
+  );
+}
+
+/** Urgency (v5 §1). Deliberately quieter than OVERDUE — an outline, not a
+ *  filled alarm — so a list of urgent things still reads calmly. */
+export function UrgentFlag() {
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: '.06em',
+        color: C.clay,
+        background: '#f7ece6',
+        border: `1px solid #e6c9bd`,
+        padding: '2px 6px',
+        borderRadius: 5,
+      }}
+    >
+      URGENT
+    </span>
+  );
+}
+
 export function GCalBadge() {
   return (
     <span

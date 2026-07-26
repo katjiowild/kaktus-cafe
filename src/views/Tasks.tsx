@@ -1,5 +1,6 @@
 import { C, SERIF } from '../tokens';
 import { useStore } from '../store';
+import { sortOpenTasks } from '../lib/derive';
 import { TaskRow } from '../components/TaskRow';
 import { EmptyState } from '../components/ui';
 import type { ViewProps } from './types';
@@ -7,11 +8,9 @@ import type { ViewProps } from './types';
 export function Tasks({ openSheet }: ViewProps) {
   const { tasks } = useStore();
   // Archived rows are completed instances of recurring tasks — history, not list
-  // items. The live list stays honest: open first (soonest due), then done.
+  // items. The live list stays honest: urgent first, then soonest due, then done.
   const live = tasks.filter((t) => !t.archived);
-  const open = live
-    .filter((t) => !t.done)
-    .sort((a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999'));
+  const open = sortOpenTasks(live.filter((t) => !t.done));
   const done = live
     .filter((t) => t.done)
     .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));

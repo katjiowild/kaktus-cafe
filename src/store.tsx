@@ -69,6 +69,7 @@ export interface Store extends Data {
     projectId: string | null;
     dueDate: string | null;
     recurrence: Recurrence | null;
+    urgent?: boolean;
   }) => Promise<void>;
   updateTask: (id: string, patch: Partial<Task>) => Promise<void>;
   toggleTask: (id: string) => Promise<void>;
@@ -92,7 +93,10 @@ export interface Store extends Data {
     datetime: string;
     peopleText: string;
     location: string;
+    notes?: string;
   }) => Promise<void>;
+  /** Notes belong to us even when the event itself is a read-only synced one. */
+  updateMeetingNotes: (id: string, notes: string) => Promise<void>;
   deleteMeeting: (id: string) => Promise<void>;
 
   createPerson: (input: { name: string; role: string; howMet: string }) => Promise<void>;
@@ -242,6 +246,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             projectId: id,
             dueDate: isoDate(),
             done: false,
+            urgent: false,
             completedAt: null,
             archived: false,
             subtasks: [],
@@ -357,7 +362,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       // ---------- Tasks ----------
-      async createTask({ title, projectId, dueDate, recurrence }) {
+      async createTask({ title, projectId, dueDate, recurrence, urgent }) {
         const now = isoNow();
         await db.tasks.add({
           id: uid('task'),
@@ -365,6 +370,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           projectId,
           dueDate,
           done: false,
+          urgent: urgent ?? false,
           completedAt: null,
           archived: false,
           subtasks: [],
@@ -419,6 +425,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               projectId: t.projectId,
               dueDate: isoDate(next),
               done: false,
+              // Urgency carries to the next occurrence — if watering the plants
+              // is urgent this week, it's the kind of thing that stays urgent.
+              urgent: t.urgent,
               completedAt: null,
               archived: false,
               // Subtasks come back unchecked — they're the steps of the chore.
@@ -511,7 +520,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       // ---------- Meetings ----------
-      async saveMeeting({ id, title, datetime, peopleText, location }) {
+      async saveMeeting({ id, title, datetime, peopleText, location, notes }) {
         const now = isoNow();
         // Link attendees to Person records where the name matches — the spec
         // wants relationships, but typing a name shouldn't be blocked on the
@@ -532,6 +541,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             peopleText,
             personIds,
             location,
+            ...(notes === undefined ? {} : { notes }),
             updatedAt: now,
           });
         } else {
@@ -544,13 +554,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             location,
             source: 'local',
             externalId: null,
-            notes: '',
+            notes: notes ?? '',
             createdAt: now,
             updatedAt: now,
           });
         }
         await after();
         showToast(id ? 'Meeting updated' : 'Meeting added');
+      },
+
+      async updateMeetingNotes(id, notes) {
+        await db.meetings.update(id, { notes, updatedAt: isoNow() });
+        await after();
+        showToast('Notes saved');
       },
 
       async deleteMeeting(id) {

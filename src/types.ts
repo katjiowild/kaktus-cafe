@@ -66,6 +66,8 @@ export interface Task {
   /** ISO date (yyyy-mm-dd). */
   dueDate: string | null;
   done: boolean;
+  /** Floats the task to the top of every list, ahead of the due-date order (v5 §1). */
+  urgent: boolean;
   /** ISO datetime, set on completion. Feeds retainer streaks. */
   completedAt: string | null;
   /** Completed instances of a recurring task are archived out of the live list. */

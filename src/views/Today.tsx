@@ -1,7 +1,8 @@
 import { C, SERIF } from '../tokens';
 import { useStore } from '../store';
 import { isoDate, timeLabel } from '../lib/dates';
-import { projectMeta } from '../lib/derive';
+import { projectMeta, sortOpenTasks } from '../lib/derive';
+import { Garden } from '../components/Garden';
 import { Plant } from '../components/Plant';
 import { TaskRow } from '../components/TaskRow';
 import { Card, EmptyState, GCalBadge } from '../components/ui';
@@ -21,13 +22,16 @@ export function Today({ openProject, openSheet }: ViewProps) {
     .filter((m) => m.datetime.slice(0, 10) === todayIso)
     .sort((a, b) => a.datetime.localeCompare(b.datetime));
 
-  // Today = anything due today or already overdue, still open.
-  const todayTasks = tasks
-    .filter((t) => !t.done && !t.archived && t.dueDate !== null && t.dueDate <= todayIso)
-    .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
+  // Today = anything due today or already overdue, still open. Urgent floats up.
+  const todayTasks = sortOpenTasks(
+    tasks.filter((t) => !t.done && !t.archived && t.dueDate !== null && t.dueDate <= todayIso),
+  );
 
   return (
     <div style={{ animation: 'sbfade .3s ease' }}>
+      {/* The garden opens Today — the first thing seen (v5 §1). */}
+      <Garden onOpenProject={openProject} />
+
       {nudges.map(({ project, meta }) => (
         <div
           key={project.id}
@@ -131,6 +135,23 @@ export function Today({ openProject, openSheet }: ViewProps) {
                   }}
                 >
                   📍 {m.location}
+                </div>
+              )}
+              {m.notes.trim() && (
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    color: C.softInk,
+                    marginTop: 6,
+                    lineHeight: 1.45,
+                    whiteSpace: 'pre-wrap',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {m.notes}
                 </div>
               )}
             </div>

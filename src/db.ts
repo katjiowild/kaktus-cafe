@@ -23,6 +23,19 @@ class KaktusDB extends Dexie {
       people: 'id, name, followUp',
       settings: 'key',
     });
+
+    // v2 — Task.urgent (v5 §1). Backfilled so existing tasks never read
+    // `undefined` where the app expects a boolean.
+    this.version(2)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx
+          .table<Task>('tasks')
+          .toCollection()
+          .modify((t) => {
+            if (typeof t.urgent !== 'boolean') t.urgent = false;
+          });
+      });
   }
 }
 

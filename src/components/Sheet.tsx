@@ -3,7 +3,7 @@ import { C, dashedBtn, input, label, pill, primaryBtn, SERIF } from '../tokens';
 import { useStore, type TemplateKey } from '../store';
 import { isoDate, WEEKDAY_LETTERS } from '../lib/dates';
 import type { Cadence, ProjectType, Recurrence } from '../types';
-import { Checkbox } from './ui';
+import { Checkbox, ToggleRow } from './ui';
 
 export type SheetState =
   | { type: 'task'; taskId?: string; projectId?: string | null }
@@ -228,6 +228,7 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
   );
   const [dueDate, setDueDate] = useState<string>(existing?.dueDate ?? isoDate());
   const [recurrence, setRecurrence] = useState<Recurrence | null>(existing?.recurrence ?? null);
+  const [urgent, setUrgent] = useState<boolean>(existing?.urgent ?? false);
   const [newSub, setNewSub] = useState('');
 
   const save = async () => {
@@ -246,10 +247,17 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
         projectId,
         dueDate: dueDate || null,
         recurrence,
+        urgent,
       });
       store.showToast('Task updated');
     } else {
-      await store.createTask({ title: t, projectId, dueDate: dueDate || null, recurrence });
+      await store.createTask({
+        title: t,
+        projectId,
+        dueDate: dueDate || null,
+        recurrence,
+        urgent,
+      });
     }
     onClose();
   };
@@ -278,6 +286,15 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
 
       <Field>
         <RepeatPicker value={recurrence} onChange={setRecurrence} />
+      </Field>
+
+      <Field top={16}>
+        <ToggleRow
+          icon="🔥"
+          label="Mark as urgent"
+          on={urgent}
+          onToggle={() => setUrgent((u) => !u)}
+        />
       </Field>
 
       {existing && (
@@ -725,6 +742,7 @@ function MeetingSheet({
   );
   const [peopleText, setPeopleText] = useState(existing?.peopleText ?? '');
   const [location, setLocation] = useState(existing?.location ?? '');
+  const [notes, setNotes] = useState(existing?.notes ?? '');
 
   const save = async () => {
     const t = title.trim();
@@ -738,6 +756,7 @@ function MeetingSheet({
       datetime: new Date(`${date}T${time || '09:00'}`).toISOString(),
       peopleText,
       location,
+      notes,
     });
     onClose();
   };
@@ -758,6 +777,26 @@ function MeetingSheet({
           {existing.location && <div>📍 {existing.location}</div>}
           {existing.peopleText && <div>With {existing.peopleText}</div>}
         </div>
+        {/* The event is read-only, but the notes are ours — most meetings will
+            be synced ones, so notes have to work here too. */}
+        <Field top={16}>
+          <label style={label}>Notes</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="What was discussed, decisions, follow-ups…"
+            style={{ ...input, resize: 'none', minHeight: 100 }}
+          />
+        </Field>
+        <button
+          onClick={() => {
+            void store.updateMeetingNotes(existing.id, notes);
+            onClose();
+          }}
+          style={{ ...primaryBtn, marginTop: 18 }}
+        >
+          Save notes
+        </button>
         <div
           style={{
             marginTop: 16,
@@ -769,8 +808,8 @@ function MeetingSheet({
             lineHeight: 1.5,
           }}
         >
-          This event came from Google Calendar. The sync is read-only, so it can only be edited in
-          Google.
+          The event itself came from your calendar and syncs read-only — change the time, title or
+          attendees there. Your notes stay here.
         </div>
       </div>
     );
@@ -819,6 +858,15 @@ function MeetingSheet({
           onChange={(e) => setLocation(e.target.value)}
           placeholder="e.g. Zoom, or Studio B"
           style={input}
+        />
+      </Field>
+      <Field>
+        <label style={label}>Notes</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="What was discussed, decisions, follow-ups…"
+          style={{ ...input, resize: 'none', minHeight: 100 }}
         />
       </Field>
       <button onClick={() => void save()} style={{ ...primaryBtn, marginTop: 20 }}>

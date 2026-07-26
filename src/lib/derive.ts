@@ -1,6 +1,19 @@
 import type { Note, Project, Task } from '../types';
 import { addDays, addMonths, daysSince, isOverdue, parseDate, today } from './dates';
 
+/**
+ * The one sort order for open tasks, used by both Today and All tasks (v5 §1).
+ * Urgent floats to the top; within each group the existing due-date order is
+ * preserved, so marking something urgent reorders it without scrambling the
+ * rest of the list. Undated tasks sink to the bottom of their group.
+ */
+export function sortOpenTasks(tasks: Task[]): Task[] {
+  return [...tasks].sort((a, b) => {
+    if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
+    return (a.dueDate ?? '9999-99-99').localeCompare(b.dueDate ?? '9999-99-99');
+  });
+}
+
 export type Vitality = 'healthy' | 'dry' | 'yellowing' | 'browning';
 
 export interface ProjectMeta {

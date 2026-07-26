@@ -84,6 +84,25 @@ export function Meetings({ openSheet }: ViewProps) {
                   📍 {m.location}
                 </div>
               )}
+              {m.notes.trim() && (
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    color: C.softInk,
+                    marginTop: 7,
+                    paddingTop: 7,
+                    borderTop: `1px solid ${C.line}`,
+                    lineHeight: 1.45,
+                    whiteSpace: 'pre-wrap',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {m.notes}
+                </div>
+              )}
             </div>
           </Card>
         );
