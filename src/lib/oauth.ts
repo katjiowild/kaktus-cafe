@@ -130,11 +130,13 @@ async function exchange(config: ProviderConfig, body: URLSearchParams): Promise<
     // application" rather than a public client. PKCE alone can't satisfy it, so
     // say precisely what to change instead of a generic failure.
     if (/client_secret|Missing required parameter: client_secret/i.test(`${code} ${desc}`)) {
+      // Note: a "Desktop app" client is NOT the fix — those only accept
+      // loopback redirect URIs, so they can't return to the hosted PWA. The
+      // supported browser path is Google Identity Services (token flow).
       throw new OAuthError(
-        'Google rejected the sign-in because this OAuth client expects a client secret. ' +
-          'In Google Cloud Console create an OAuth client of type "Desktop app" (a public ' +
-          'client, no secret) and use its Client ID here — a "Web application" client cannot ' +
-          'complete PKCE from the browser.',
+        'Google rejected the sign-in: this OAuth client expects a client secret, which a ' +
+          'browser app cannot hold. The Google connection needs switching to Google Identity ' +
+          'Services — Outlook is unaffected.',
       );
     }
     if (/redirect_uri_mismatch/i.test(code)) {

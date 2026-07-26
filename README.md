@@ -71,7 +71,11 @@ https://katjiowild.github.io/kaktus-cafe/
 - **Google** — Cloud Console → Credentials → your OAuth client → *Authorised redirect URIs*. Keep the consent screen in **Testing** with yourself as the sole test user; that avoids the public-app verification process. Add `http://localhost:5173/kaktus-cafe/` too if you ever want sync to work while developing.
 - **Microsoft** — the registration already has a SPA redirect URI; make sure `Calendars.Read` (delegated) is granted under API permissions. The authority is `/common`, so personal Microsoft accounts work alongside work ones.
 
-> **One thing to watch on Google.** A browser app doing PKCE has to be a *public* client. If the OAuth client was created as a **Web application**, Google will demand a `client_secret` at the token step and sign-in will fail — the app detects exactly that and tells you so. The fix is to create an OAuth client of type **Desktop app** and use its Client ID. Microsoft has no such restriction.
+> **One thing to watch on Google.** A browser app doing PKCE has to be a *public* client. If the OAuth client was created as a **Web application**, Google may demand a `client_secret` at the token step and sign-in will fail — the app detects exactly that and says so.
+>
+> If that happens, the fix is **not** a "Desktop app" client: those only accept loopback (`http://localhost`) redirect URIs, so they can't return to a GitHub Pages URL at all. The fix is to keep the Web client and switch the Google path to **Google Identity Services** (`google.accounts.oauth2.initTokenClient`), the flow Google supports for browser-only apps with no secret. Trade-off: it issues no refresh token, so tokens last about an hour and are re-acquired (usually silently) on the next sync.
+>
+> Microsoft has no such restriction — SPA redirect URIs, PKCE and refresh tokens all work as implemented.
 
 ## Contacts import (Phase 3)
 
