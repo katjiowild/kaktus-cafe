@@ -9,8 +9,18 @@ import {
 } from 'react';
 import { db, getSetting, setSetting, uid } from './db';
 import { isoDate, isoNow, nextOccurrence, parseDate, today } from './lib/dates';
+import {
+  disconnectAccount,
+  loadAccounts,
+  newAccount,
+  syncAll,
+  upsertAccount,
+} from './lib/calendarSync';
+import { beginAuth, completeAuthIfReturning, emailFromIdToken, PROVIDERS } from './lib/oauth';
 import type {
   Cadence,
+  CalendarAccount,
+  CalendarProvider,
   Meeting,
   Note,
   Person,
@@ -28,6 +38,7 @@ interface Data {
   meetings: Meeting[];
   people: Person[];
   dismissed: string[];
+  accounts: CalendarAccount[];
 }
 
 const EMPTY: Data = {
@@ -37,6 +48,7 @@ const EMPTY: Data = {
   meetings: [],
   people: [],
   dismissed: [],
+  accounts: [],
 };
 
 export interface Store extends Data {
@@ -63,12 +75,15 @@ export interface Store extends Data {
   removeMilestone: (projectId: string, milestoneId: string) => Promise<void>;
   moveMilestone: (projectId: string, milestoneId: string, dir: -1 | 1) => Promise<void>;
   addComment: (projectId: string, text: string) => Promise<void>;
+  /** Project↔Person lives on Person.projectIds — one side, no duplicate field. */
+  setProjectPeople: (projectId: string, personIds: string[]) => Promise<void>;
 
   createTask: (input: {
     title: string;
     projectId: string | null;
     dueDate: string | null;
     recurrence: Recurrence | null;
+    urgent?: boolean;
   }) => Promise<void>;
   updateTask: (id: string, patch: Partial<Task>) => Promise<void>;
   toggleTask: (id: string) => Promise<void>;
@@ -82,6 +97,8 @@ export interface Store extends Data {
     title: string;
     body: string;
     projectId: string | null;
+    personIds: string[];
+    meetingId?: string | null;
   }) => Promise<void>;
   toggleNotePin: (id: string) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
@@ -90,6 +107,7 @@ export interface Store extends Data {
     id?: string;
     title: string;
     datetime: string;
+    personIds: string[];
     peopleText: string;
     location: string;
   }) => Promise<void>;
@@ -97,10 +115,16 @@ export interface Store extends Data {
 
   createPerson: (input: { name: string; role: string; howMet: string }) => Promise<void>;
   updatePerson: (id: string, patch: Partial<Person>) => Promise<void>;
-  addLogEntry: (personId: string, text: string) => Promise<void>;
   deletePerson: (id: string) => Promise<void>;
 
   dismissNudge: (projectId: string) => Promise<void>;
+
+  // ---------- Calendar sync (v5 §3–4) ----------
+  accounts: CalendarAccount[];
+  syncing: boolean;
+  connectCalendar: (provider: CalendarProvider) => Promise<void>;
+  disconnectCalendar: (accountId: string) => Promise<void>;
+  syncCalendars: () => Promise<void>;
 }
 
 const StoreContext = createContext<Store | null>(null);
@@ -157,24 +181,52 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => setToast((t) => (t === msg ? '' : t)), 2200);
   }, []);
 
+  const [syncing, setSyncing] = useState(false);
+
   const reload = useCallback(async () => {
-    const [projects, tasks, notes, meetings, people, dismissed] = await Promise.all([
+    const [projects, tasks, notes, meetings, people, dismissed, accounts] = await Promise.all([
       db.projects.toArray(),
       db.tasks.toArray(),
       db.notes.toArray(),
       db.meetings.toArray(),
       db.people.toArray(),
       getSetting<string[]>('dismissedNudges', []),
+      loadAccounts(),
     ]);
-    setData({ projects, tasks, notes, meetings, people, dismissed });
+    setData({ projects, tasks, notes, meetings, people, dismissed, accounts });
   }, []);
 
   useEffect(() => {
     void (async () => {
+      // If we've just come back from a provider's consent screen, finish the
+      // handshake before the first render so the account is already there.
+      try {
+        const done = await completeAuthIfReturning();
+        if (done) {
+          const email =
+            emailFromIdToken(done.idToken) ?? `${PROVIDERS[done.provider].label} account`;
+          await upsertAccount(
+            newAccount({
+              provider: done.provider,
+              email,
+              accessToken: done.accessToken,
+              refreshToken: done.refreshToken,
+              expiresAt: done.expiresAt,
+            }),
+          );
+          showToast(`Connected ${email}`);
+          setSyncing(true);
+          const { errors } = await syncAll();
+          setSyncing(false);
+          if (errors.length) showToast(errors[0]);
+        }
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : 'Sign-in failed.');
+      }
       await reload();
       setReady(true);
     })();
-  }, [reload]);
+  }, [reload, showToast]);
 
   /**
    * Stamp a project as touched. Any completed task, new note, milestone change
@@ -242,6 +294,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             projectId: id,
             dueDate: isoDate(),
             done: false,
+            urgent: false,
             completedAt: null,
             archived: false,
             subtasks: [],
@@ -356,8 +409,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         showToast('Saved');
       },
 
+      async setProjectPeople(projectId, personIds) {
+        const people = await db.people.toArray();
+        await Promise.all(
+          people.map((p) => {
+            const linked = personIds.includes(p.id);
+            const has = p.projectIds.includes(projectId);
+            if (linked === has) return Promise.resolve(0);
+            const next = linked
+              ? [...p.projectIds, projectId]
+              : p.projectIds.filter((id) => id !== projectId);
+            return db.people.update(p.id, { projectIds: next, updatedAt: isoNow() });
+          }),
+        );
+        await after();
+      },
+
       // ---------- Tasks ----------
-      async createTask({ title, projectId, dueDate, recurrence }) {
+      async createTask({ title, projectId, dueDate, recurrence, urgent }) {
         const now = isoNow();
         await db.tasks.add({
           id: uid('task'),
@@ -365,6 +434,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           projectId,
           dueDate,
           done: false,
+          urgent: urgent ?? false,
           completedAt: null,
           archived: false,
           subtasks: [],
@@ -419,6 +489,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               projectId: t.projectId,
               dueDate: isoDate(next),
               done: false,
+              // Urgency carries to the next occurrence — if watering the plants
+              // is urgent this week, it's the kind of thing that stays urgent.
+              urgent: t.urgent,
               completedAt: null,
               archived: false,
               // Subtasks come back unchecked — they're the steps of the chore.
@@ -476,16 +549,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       // ---------- Notes ----------
-      async saveNote({ id, title, body, projectId }) {
+      async saveNote({ id, title, body, projectId, personIds, meetingId }) {
         const now = isoNow();
         if (id) {
-          await db.notes.update(id, { title, body, projectId, updatedAt: now });
+          await db.notes.update(id, {
+            title,
+            body,
+            projectId,
+            personIds,
+            ...(meetingId === undefined ? {} : { meetingId }),
+            updatedAt: now,
+          });
         } else {
           await db.notes.add({
             id: uid('note'),
             title,
             body,
             projectId,
+            personIds,
+            meetingId: meetingId ?? null,
             date: isoDate(),
             pinned: false,
             createdAt: now,
@@ -511,20 +593,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       // ---------- Meetings ----------
-      async saveMeeting({ id, title, datetime, peopleText, location }) {
+      async saveMeeting({ id, title, datetime, personIds, peopleText, location }) {
         const now = isoNow();
-        // Link attendees to Person records where the name matches — the spec
-        // wants relationships, but typing a name shouldn't be blocked on the
-        // person existing in the CRM first.
-        const people = await db.people.toArray();
-        const names = peopleText
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
-        const personIds = names
-          .map((n) => people.find((p) => p.name.toLowerCase() === n.toLowerCase())?.id)
-          .filter((x): x is string => Boolean(x));
-
+        // Links come from the picker now (v5 §2) rather than being guessed by
+        // name-matching free text. `peopleText` stays for attendees who aren't
+        // CRM records ("the team").
         if (id) {
           await db.meetings.update(id, {
             title,
@@ -544,7 +617,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             location,
             source: 'local',
             externalId: null,
-            notes: '',
+            accountId: null,
             createdAt: now,
             updatedAt: now,
           });
@@ -554,9 +627,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       async deleteMeeting(id) {
+        // Orphan the notes rather than cascade-delete: they're hers, and losing
+        // a write-up because the calendar entry went away would be worse than
+        // an unlinked note.
+        const linked = await db.notes.where('meetingId').equals(id).toArray();
+        await Promise.all(
+          linked.map((n) => db.notes.update(n.id, { meetingId: null, updatedAt: isoNow() })),
+        );
         await db.meetings.delete(id);
         await after();
-        showToast('Meeting deleted');
+        showToast(
+          linked.length
+            ? `Meeting deleted — ${linked.length} ${linked.length === 1 ? 'note' : 'notes'} kept`
+            : 'Meeting deleted',
+        );
       },
 
       // ---------- People ----------
@@ -569,7 +653,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           howMet,
           followUp: false,
           followUpDate: null,
-          log: [],
           projectIds: [],
           createdAt: now,
           updatedAt: now,
@@ -581,17 +664,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       async updatePerson(id, patch) {
         await db.people.update(id, { ...patch, updatedAt: isoNow() });
         await after();
-      },
-
-      async addLogEntry(personId, text) {
-        const p = await db.people.get(personId);
-        if (!p) return;
-        await db.people.update(personId, {
-          log: [{ id: uid('log'), at: isoNow(), text }, ...p.log],
-          updatedAt: isoNow(),
-        });
-        await after();
-        showToast('Logged');
       },
 
       async deletePerson(id) {
@@ -608,8 +680,48 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
         await after();
       },
+
+      // ---------- Calendar sync ----------
+      syncing,
+
+      async connectCalendar(provider) {
+        try {
+          // Navigates away; we pick the flow back up in the effect above.
+          await beginAuth(PROVIDERS[provider]);
+        } catch (e) {
+          showToast(e instanceof Error ? e.message : 'Could not start sign-in.');
+        }
+      },
+
+      async disconnectCalendar(accountId) {
+        await disconnectAccount(accountId);
+        await after();
+        showToast('Account disconnected');
+      },
+
+      async syncCalendars() {
+        setSyncing(true);
+        try {
+          const { result, errors } = await syncAll();
+          await after();
+          if (errors.length) {
+            showToast(errors[0]);
+          } else if (result.added || result.updated || result.removed) {
+            const bits = [
+              result.added && `${result.added} new`,
+              result.updated && `${result.updated} updated`,
+              result.removed && `${result.removed} removed`,
+            ].filter(Boolean);
+            showToast(`Calendar synced — ${bits.join(', ')}`);
+          } else {
+            showToast('Calendar up to date');
+          }
+        } finally {
+          setSyncing(false);
+        }
+      },
     };
-  }, [data, ready, toast, showToast, reload, touchProject]);
+  }, [data, ready, toast, syncing, showToast, reload, touchProject]);
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;
 }
@@ -618,4 +730,10 @@ export function useStore(): Store {
   const s = useContext(StoreContext);
   if (!s) throw new Error('useStore must be used inside <StoreProvider>');
   return s;
+}
+
+/** Maps a meeting's accountId to the email shown on its provider badge. */
+export function useAccountEmail(): (accountId: string | null) => string | undefined {
+  const { accounts } = useStore();
+  return (accountId) => accounts.find((a) => a.id === accountId)?.email;
 }

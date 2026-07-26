@@ -3,17 +3,24 @@ import { C, dashedBtn, input, label, pill, primaryBtn, SERIF } from '../tokens';
 import { useStore, type TemplateKey } from '../store';
 import { isoDate, WEEKDAY_LETTERS } from '../lib/dates';
 import type { Cadence, ProjectType, Recurrence } from '../types';
-import { Checkbox } from './ui';
+import { Checkbox, ToggleRow } from './ui';
+import { PersonPicker } from './PersonPicker';
 
 export type SheetState =
   | { type: 'task'; taskId?: string; projectId?: string | null }
-  | { type: 'note'; noteId?: string; projectId?: string | null }
+  | {
+      type: 'note';
+      noteId?: string;
+      projectId?: string | null;
+      meetingId?: string | null;
+      personId?: string | null;
+    }
   | { type: 'project'; projectId?: string }
   | { type: 'meeting'; meetingId?: string }
   | { type: 'person'; personId?: string }
   | {
       type: 'mini';
-      kind: 'milestone' | 'comment' | 'ptask' | 'subtask' | 'log';
+      kind: 'milestone' | 'comment' | 'ptask' | 'subtask';
       ctx: string;
       title: string;
       label: string;
@@ -228,6 +235,7 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
   );
   const [dueDate, setDueDate] = useState<string>(existing?.dueDate ?? isoDate());
   const [recurrence, setRecurrence] = useState<Recurrence | null>(existing?.recurrence ?? null);
+  const [urgent, setUrgent] = useState<boolean>(existing?.urgent ?? false);
   const [newSub, setNewSub] = useState('');
 
   const save = async () => {
@@ -246,10 +254,17 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
         projectId,
         dueDate: dueDate || null,
         recurrence,
+        urgent,
       });
       store.showToast('Task updated');
     } else {
-      await store.createTask({ title: t, projectId, dueDate: dueDate || null, recurrence });
+      await store.createTask({
+        title: t,
+        projectId,
+        dueDate: dueDate || null,
+        recurrence,
+        urgent,
+      });
     }
     onClose();
   };
@@ -278,6 +293,15 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
 
       <Field>
         <RepeatPicker value={recurrence} onChange={setRecurrence} />
+      </Field>
+
+      <Field top={16}>
+        <ToggleRow
+          icon="🔥"
+          label="Mark as urgent"
+          on={urgent}
+          onToggle={() => setUrgent((u) => !u)}
+        />
       </Field>
 
       {existing && (
@@ -392,10 +416,23 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
 function NoteSheet({ state, onClose }: { state: SheetState & { type: 'note' }; onClose: () => void }) {
   const store = useStore();
   const existing = state.noteId ? store.notes.find((n) => n.id === state.noteId) : undefined;
-  const [title, setTitle] = useState(existing?.title ?? '');
+  const meetingId = existing?.meetingId ?? state.meetingId ?? null;
+  const meeting = meetingId ? store.meetings.find((m) => m.id === meetingId) : undefined;
+
+  // A note started from a meeting inherits its attendees, and — only for the
+  // first note from that meeting — its title. Prefilling every time would give
+  // you a stack of identically-named notes.
+  const isFirstFromMeeting =
+    !!meeting && !store.notes.some((n) => n.meetingId === meeting.id);
+  const [title, setTitle] = useState(
+    existing?.title ?? (isFirstFromMeeting ? (meeting?.title ?? '') : ''),
+  );
   const [body, setBody] = useState(existing?.body ?? '');
   const [projectId, setProjectId] = useState<string | null>(
     existing?.projectId ?? state.projectId ?? null,
+  );
+  const [personIds, setPersonIds] = useState<string[]>(
+    existing?.personIds ?? meeting?.personIds ?? (state.personId ? [state.personId] : []),
   );
 
   const save = async () => {
@@ -408,12 +445,32 @@ function NoteSheet({ state, onClose }: { state: SheetState & { type: 'note' }; o
       title: title.trim() || 'Untitled',
       body: body.trim(),
       projectId,
+      personIds,
+      meetingId,
     });
     onClose();
   };
 
   return (
     <>
+      {meeting && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: '9px 12px',
+            background: C.paper2,
+            borderRadius: 10,
+            fontSize: 12,
+            color: C.softInk,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <span style={{ color: C.muted }}>◷</span>
+          From <b style={{ color: C.ink }}>{meeting.title}</b>
+        </div>
+      )}
       <Field top={12}>
         <label style={label}>Title</label>
         <input
@@ -435,6 +492,13 @@ function NoteSheet({ state, onClose }: { state: SheetState & { type: 'note' }; o
       </Field>
       <Field>
         <ProjectSelect value={projectId} onChange={setProjectId} />
+      </Field>
+      <Field>
+        <PersonPicker
+          selected={personIds}
+          onChange={setPersonIds}
+          hint="Linked notes show on each person's page."
+        />
       </Field>
 
       {existing && (
@@ -517,6 +581,10 @@ function ProjectSheet({
   const [startDate, setStartDate] = useState(existing?.startDate ?? isoDate());
   const [endDate, setEndDate] = useState(existing?.endDate ?? '');
   const [cadence, setCadence] = useState<Cadence>(existing?.cadence ?? 'weekly');
+  // Project↔Person is stored on the Person side, so read the current links out.
+  const [personIds, setPersonIds] = useState<string[]>(
+    existing ? store.people.filter((p) => p.projectIds.includes(existing.id)).map((p) => p.id) : [],
+  );
 
   const save = async () => {
     const n = name.trim();
@@ -532,9 +600,10 @@ function ProjectSheet({
         endDate: existing.type === 'active' ? endDate || null : null,
         cadence: existing.type === 'retainer' ? cadence : null,
       });
+      await store.setProjectPeople(existing.id, personIds);
       store.showToast('Project updated');
     } else {
-      await store.createProject({
+      const newId = await store.createProject({
         name: n,
         type,
         template,
@@ -543,6 +612,7 @@ function ProjectSheet({
         endDate: type === 'active' ? endDate || null : null,
         cadence: type === 'retainer' ? cadence : null,
       });
+      await store.setProjectPeople(newId, personIds);
       store.showToast('Project created');
     }
     onClose();
@@ -607,6 +677,15 @@ function ProjectSheet({
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What is this project?"
           style={{ ...input, resize: 'none', minHeight: 64, fontSize: 14 }}
+        />
+      </Field>
+
+      <Field>
+        <PersonPicker
+          selected={personIds}
+          onChange={setPersonIds}
+          label="People involved"
+          hint="Shows this project on their page, and them on this project."
         />
       </Field>
 
@@ -707,9 +786,13 @@ function ProjectSheet({
 function MeetingSheet({
   state,
   onClose,
+  onAddNote,
+  onOpenNote,
 }: {
   state: SheetState & { type: 'meeting' };
   onClose: () => void;
+  onAddNote: (meetingId: string) => void;
+  onOpenNote: (noteId: string) => void;
 }) {
   const store = useStore();
   const existing = state.meetingId
@@ -723,8 +806,63 @@ function MeetingSheet({
   const [time, setTime] = useState(
     `${String(init.getHours()).padStart(2, '0')}:${String(init.getMinutes()).padStart(2, '0')}`,
   );
+  const [personIds, setPersonIds] = useState<string[]>(existing?.personIds ?? []);
   const [peopleText, setPeopleText] = useState(existing?.peopleText ?? '');
   const [location, setLocation] = useState(existing?.location ?? '');
+
+  // Notes are ordinary Note records linked to this meeting, so they also show
+  // up in the Notes list and on each attendee's page.
+  const linkedNotes = existing
+    ? store.notes.filter((n) => n.meetingId === existing.id)
+    : [];
+
+  const notesSection = existing ? (
+    <Field top={18}>
+      <label style={label}>Notes</label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {linkedNotes.map((n) => (
+          <div
+            key={n.id}
+            onClick={() => onOpenNote(n.id)}
+            style={{
+              background: C.card,
+              border: `1px solid ${C.cardBorder}`,
+              borderRadius: 12,
+              padding: '12px 13px',
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{n.title}</div>
+            <div
+              style={{
+                fontSize: 12.5,
+                color: C.softInk,
+                lineHeight: 1.45,
+                marginTop: 4,
+                whiteSpace: 'pre-wrap',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {n.body}
+            </div>
+          </div>
+        ))}
+        <button onClick={() => onAddNote(existing.id)} style={dashedBtn}>
+          ＋ Add a note from this meeting
+        </button>
+      </div>
+      <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>
+        These appear in Notes alongside everything else.
+      </div>
+    </Field>
+  ) : (
+    <div style={{ fontSize: 11.5, color: C.muted, marginTop: 14, lineHeight: 1.5 }}>
+      Save the meeting first, then you can add notes to it.
+    </div>
+  );
 
   const save = async () => {
     const t = title.trim();
@@ -736,6 +874,7 @@ function MeetingSheet({
       id: existing?.id,
       title: t,
       datetime: new Date(`${date}T${time || '09:00'}`).toISOString(),
+      personIds,
       peopleText,
       location,
     });
@@ -758,6 +897,9 @@ function MeetingSheet({
           {existing.location && <div>📍 {existing.location}</div>}
           {existing.peopleText && <div>With {existing.peopleText}</div>}
         </div>
+        {/* The event is read-only, but the notes are ours — most meetings will
+            be synced ones, so notes have to work here too. */}
+        {notesSection}
         <div
           style={{
             marginTop: 16,
@@ -769,8 +911,8 @@ function MeetingSheet({
             lineHeight: 1.5,
           }}
         >
-          This event came from Google Calendar. The sync is read-only, so it can only be edited in
-          Google.
+          The event itself came from your calendar and syncs read-only — change the time, title or
+          attendees there. Your notes stay here.
         </div>
       </div>
     );
@@ -801,15 +943,18 @@ function MeetingSheet({
         </div>
       </Field>
       <Field>
-        <label style={label}>With</label>
+        <PersonPicker selected={personIds} onChange={setPersonIds} label="With" />
+      </Field>
+      <Field>
+        <label style={label}>Anyone else</label>
         <input
           value={peopleText}
           onChange={(e) => setPeopleText(e.target.value)}
-          placeholder="e.g. Sam Rivera, Alex Chen"
+          placeholder="e.g. the team"
           style={input}
         />
         <div style={{ fontSize: 11, color: C.muted, marginTop: 5 }}>
-          Names that match someone in People are linked to their record automatically.
+          For attendees you don't keep in People.
         </div>
       </Field>
       <Field>
@@ -821,6 +966,7 @@ function MeetingSheet({
           style={input}
         />
       </Field>
+      {notesSection}
       <button onClick={() => void save()} style={{ ...primaryBtn, marginTop: 20 }}>
         {existing ? 'Update meeting' : 'Add meeting'}
       </button>
@@ -945,9 +1091,6 @@ function MiniSheet({ state, onClose }: { state: SheetState & { type: 'mini' }; o
       case 'subtask':
         await store.addSubtask(state.ctx, v);
         break;
-      case 'log':
-        await store.addLogEntry(state.ctx, v);
-        break;
     }
     onClose();
   };
@@ -956,7 +1099,7 @@ function MiniSheet({ state, onClose }: { state: SheetState & { type: 'mini' }; o
     <>
       <Field top={12}>
         <label style={label}>{state.label}</label>
-        {state.kind === 'comment' || state.kind === 'log' ? (
+        {state.kind === 'comment' ? (
           <textarea
             value={value}
             autoFocus
@@ -997,10 +1140,12 @@ const TITLES: Record<string, string> = {
 export function Sheet({
   state,
   onClose,
+  onOpenSheet,
   wide,
 }: {
   state: SheetState;
   onClose: () => void;
+  onOpenSheet: (s: SheetState) => void;
   wide: boolean;
 }) {
   // Escape closes, and the sheet traps the page behind it.
@@ -1026,7 +1171,14 @@ export function Sheet({
       {state.type === 'task' && <TaskSheet state={state} onClose={onClose} />}
       {state.type === 'note' && <NoteSheet state={state} onClose={onClose} />}
       {state.type === 'project' && <ProjectSheet state={state} onClose={onClose} />}
-      {state.type === 'meeting' && <MeetingSheet state={state} onClose={onClose} />}
+      {state.type === 'meeting' && (
+        <MeetingSheet
+          state={state}
+          onClose={onClose}
+          onAddNote={(meetingId) => onOpenSheet({ type: 'note', meetingId })}
+          onOpenNote={(noteId) => onOpenSheet({ type: 'note', noteId })}
+        />
+      )}
       {state.type === 'person' && <PersonSheet state={state} onClose={onClose} />}
       {state.type === 'mini' && <MiniSheet state={state} onClose={onClose} />}
     </SheetShell>

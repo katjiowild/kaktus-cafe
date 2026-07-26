@@ -7,15 +7,14 @@ import type { ViewProps } from './types';
 
 export function Notes({ openSheet, wide }: ViewProps) {
   const store = useStore();
-  const { notes, projects } = store;
-  const [filter, setFilter] = useState<string | null>(null);
+  const { notes, projects, meetings } = store;
+  const meetingOf = (id: string | null) => (id ? meetings.find((m) => m.id === id) : undefined);
   const [expanded, setExpanded] = useState<string[]>([]);
   /** Which note bodies are actually clipped by the 2-line clamp. */
   const [clipped, setClipped] = useState<Record<string, boolean>>({});
   const bodyRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const filtered = notes.filter((n) => filter === null || n.projectId === filter);
-  const sorted = [...filtered].sort((a, b) => {
+  const sorted = [...notes].sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     return b.date.localeCompare(a.date);
   });
@@ -43,52 +42,16 @@ export function Notes({ openSheet, wide }: ViewProps) {
 
   useEffect(() => {
     measure();
-  }, [measure, sorted.length, wide, filter]);
+  }, [measure, sorted.length, wide]);
 
   useEffect(() => {
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, [measure]);
 
-  const chips = [{ id: null as string | null, label: 'All' }, ...projects.map((p) => ({ id: p.id, label: p.name }))];
 
   return (
     <div style={{ animation: 'sbfade .3s ease' }}>
-      {/* Filter by project — not by free-text category (§3.4). */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 7,
-          overflowX: 'auto',
-          padding: '2px 2px 12px',
-        }}
-      >
-        {chips.map((c) => {
-          const on = filter === c.id;
-          return (
-            <button
-              key={c.id ?? 'all'}
-              onClick={() => setFilter(c.id)}
-              style={{
-                flexShrink: 0,
-                border: `1px solid ${on ? C.deepSage : C.line}`,
-                background: on ? C.deepSage : C.card,
-                color: on ? C.paper : C.softInk,
-                borderRadius: 20,
-                padding: '6px 13px',
-                fontSize: 12.5,
-                fontWeight: 600,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                fontFamily: 'inherit',
-              }}
-            >
-              {c.label}
-            </button>
-          );
-        })}
-      </div>
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
         {sorted.map((n) => {
           const project = projects.find((p) => p.id === n.projectId);
@@ -151,7 +114,16 @@ export function Notes({ openSheet, wide }: ViewProps) {
                   {isExpanded ? 'Show less' : 'Read more'}
                 </span>
               )}
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  rowGap: 6,
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  marginTop: 10,
+                }}
+              >
                 {project && (
                   <span
                     style={{
@@ -164,6 +136,23 @@ export function Notes({ openSheet, wide }: ViewProps) {
                     }}
                   >
                     {project.name}
+                  </span>
+                )}
+                {meetingOf(n.meetingId) && (
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 600,
+                      padding: '3px 8px',
+                      borderRadius: 20,
+                      background: C.paper2,
+                      color: C.clay,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    ◷ {meetingOf(n.meetingId)!.title}
                   </span>
                 )}
                 <span
@@ -207,7 +196,7 @@ export function Notes({ openSheet, wide }: ViewProps) {
         })}
         {sorted.length === 0 && (
           <EmptyState>
-            {filter ? 'No notes in this project yet.' : 'No notes yet. Tap + to capture one.'}
+            No notes yet. Tap + to capture one.
           </EmptyState>
         )}
       </div>

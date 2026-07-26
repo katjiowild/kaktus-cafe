@@ -2,7 +2,7 @@ import { C, CARD_SHADOW } from '../tokens';
 import { dueLabel, isOverdue, recurrenceLabel } from '../lib/dates';
 import { useStore } from '../store';
 import type { Task } from '../types';
-import { Checkbox, OverdueFlag, ProjectChip } from './ui';
+import { Checkbox, OverdueFlag, ProjectChip, UrgentFlag } from './ui';
 
 export function TaskRow({
   task,
@@ -58,6 +58,7 @@ export function TaskRow({
                 flexWrap: 'wrap',
               }}
             >
+              {task.urgent && !task.done && <UrgentFlag />}
               {overdue && <OverdueFlag />}
               {project && <ProjectChip name={project.name} />}
               {task.recurrence && (
@@ -82,6 +83,7 @@ export function TaskRow({
             </div>
           )}
         </div>
+        {compact && task.urgent && !task.done && <UrgentFlag />}
         {compact && overdue && <OverdueFlag />}
       </div>
 

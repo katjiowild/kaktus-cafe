@@ -1,15 +1,17 @@
 import { ACCENT, C, SERIF } from '../tokens';
-import { useStore } from '../store';
+import { useAccountEmail, useStore } from '../store';
 import { shortDate, timeLabel } from '../lib/dates';
 import { projectMeta, VITALITY_LABEL, type Vitality } from '../lib/derive';
 import { Plant } from '../components/Plant';
-import { Card, EmptyState, GCalBadge, PersonIcon, TypeBadge } from '../components/ui';
+import { Card, EmptyState, PersonIcon, SourceBadge, TypeBadge } from '../components/ui';
 import type { View, ViewProps } from './types';
 
 // ---------------- Meetings ----------------
 
 export function Meetings({ openSheet }: ViewProps) {
-  const { meetings } = useStore();
+  const { meetings, notes } = useStore();
+  const accountEmail = useAccountEmail();
+  const notesFor = (meetingId: string) => notes.filter((n) => n.meetingId === meetingId);
   const sorted = [...meetings].sort((a, b) => a.datetime.localeCompare(b.datetime));
 
   return (
@@ -60,7 +62,7 @@ export function Meetings({ openSheet }: ViewProps) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                 <span style={{ fontWeight: 600, fontSize: 15 }}>{m.title}</span>
-                {m.source === 'google' && <GCalBadge />}
+                <SourceBadge source={m.source} account={accountEmail(m.accountId)} />
               </div>
               <div style={{ fontSize: 12, color: C.clay, fontWeight: 600, marginTop: 2 }}>
                 {timeLabel(m.datetime)} · {shortDate(m.datetime)}
@@ -82,6 +84,35 @@ export function Meetings({ openSheet }: ViewProps) {
                   }}
                 >
                   📍 {m.location}
+                </div>
+              )}
+              {notesFor(m.id).length > 0 && (
+                <div
+                  style={{
+                    marginTop: 7,
+                    paddingTop: 7,
+                    borderTop: `1px solid ${C.line}`,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 12.5,
+                      color: C.softInk,
+                      lineHeight: 1.45,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {notesFor(m.id)[0].body}
+                  </div>
+                  {notesFor(m.id).length > 1 && (
+                    <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginTop: 4 }}>
+                      +{notesFor(m.id).length - 1} more{' '}
+                      {notesFor(m.id).length === 2 ? 'note' : 'notes'}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

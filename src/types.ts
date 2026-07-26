@@ -66,6 +66,8 @@ export interface Task {
   /** ISO date (yyyy-mm-dd). */
   dueDate: string | null;
   done: boolean;
+  /** Floats the task to the top of every list, ahead of the due-date order (v5 §1). */
+  urgent: boolean;
   /** ISO datetime, set on completion. Feeds retainer streaks. */
   completedAt: string | null;
   /** Completed instances of a recurring task are archived out of the live list. */
@@ -84,6 +86,11 @@ export interface Note {
   body: string;
   /** Notes tag to a Project, not a free-text category (§3.4). */
   projectId: string | null;
+  /** Linked People — mirrors Meeting.personIds (v5 §2). */
+  personIds: string[];
+  /** The meeting this came out of, if any. Notes taken in a meeting are
+   *  ordinary Notes: they show in the Notes list and on the meeting. */
+  meetingId: string | null;
   /** ISO date. */
   date: string;
   pinned: boolean;
@@ -101,20 +108,14 @@ export interface Meeting {
   /** Attendees who aren't (yet) Person records — kept as typed. */
   peopleText: string;
   location: string;
-  /** Google events are read-only and badged GCAL (§4). */
-  source: 'local' | 'google';
-  /** Google's event id, so a re-sync updates rather than duplicates. */
+  /** Synced events are read-only and badged with their provider (§4, v5 §3–4). */
+  source: 'local' | 'google' | 'outlook';
+  /** The provider's event id, so a re-sync updates rather than duplicates. */
   externalId: string | null;
-  notes: string;
+  /** Which connected account this came from — null for local meetings (v5 §3). */
+  accountId: string | null;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface LogEntry {
-  id: string;
-  /** ISO datetime. */
-  at: string;
-  text: string;
 }
 
 export interface Person {
@@ -125,17 +126,40 @@ export interface Person {
   followUp: boolean;
   /** ISO date, optional — "reconnect around then". */
   followUpDate: string | null;
-  /** The interaction log is the core of this record's value (§3.6). */
-  log: LogEntry[];
   projectIds: string[];
   createdAt: string;
   updatedAt: string;
 }
+// The old per-person interaction log was folded into Notes: a note linked to a
+// person is the same thing, and it also shows up in Notes and can carry a
+// project or meeting. One place for each thing (§1).
 
-/** Small key/value bag: dismissed nudges, Google tokens, last-seen version. */
+/** Small key/value bag: dismissed nudges, OAuth tokens, last-seen version. */
 export interface Setting {
   key: string;
   value: unknown;
+}
+
+export type CalendarProvider = 'google' | 'outlook';
+
+/**
+ * One connected calendar account (v5 §3–4). Multiple accounts per provider are
+ * supported — personal + work — each with its own tokens, so revoking or
+ * re-authorising one never disturbs another.
+ */
+export interface CalendarAccount {
+  id: string;
+  provider: CalendarProvider;
+  /** The account's own email, shown in Settings and on the meeting badge. */
+  email: string;
+  accessToken: string;
+  /** Absolute epoch ms; refreshed quietly when past. */
+  expiresAt: number;
+  refreshToken: string | null;
+  /** ISO datetime of the last successful sync. */
+  lastSyncedAt: string | null;
+  /** Last sync failure, surfaced in Settings rather than swallowed. */
+  lastError: string | null;
 }
 
 export interface Backup {

@@ -1,16 +1,19 @@
 import { C, SERIF } from '../tokens';
-import { useStore } from '../store';
+import { useAccountEmail, useStore } from '../store';
 import { isoDate, timeLabel } from '../lib/dates';
-import { projectMeta } from '../lib/derive';
+import { projectMeta, sortOpenTasks } from '../lib/derive';
+import { Garden } from '../components/Garden';
 import { Plant } from '../components/Plant';
 import { TaskRow } from '../components/TaskRow';
-import { Card, EmptyState, GCalBadge } from '../components/ui';
+import { Card, EmptyState, SourceBadge } from '../components/ui';
 import type { ViewProps } from './types';
 
 export function Today({ openProject, openSheet }: ViewProps) {
   const store = useStore();
+  const accountEmail = useAccountEmail();
   const { projects, tasks, meetings, notes, dismissed } = store;
   const todayIso = isoDate();
+  const notesFor = (meetingId: string) => notes.filter((n) => n.meetingId === meetingId);
 
   // §5.3 — Active projects idle for ≥7 days, not dismissed.
   const nudges = projects
@@ -21,13 +24,16 @@ export function Today({ openProject, openSheet }: ViewProps) {
     .filter((m) => m.datetime.slice(0, 10) === todayIso)
     .sort((a, b) => a.datetime.localeCompare(b.datetime));
 
-  // Today = anything due today or already overdue, still open.
-  const todayTasks = tasks
-    .filter((t) => !t.done && !t.archived && t.dueDate !== null && t.dueDate <= todayIso)
-    .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
+  // Today = anything due today or already overdue, still open. Urgent floats up.
+  const todayTasks = sortOpenTasks(
+    tasks.filter((t) => !t.done && !t.archived && t.dueDate !== null && t.dueDate <= todayIso),
+  );
 
   return (
     <div style={{ animation: 'sbfade .3s ease' }}>
+      {/* The garden opens Today — the first thing seen (v5 §1). */}
+      <Garden onOpenProject={openProject} />
+
       {nudges.map(({ project, meta }) => (
         <div
           key={project.id}
@@ -133,8 +139,24 @@ export function Today({ openProject, openSheet }: ViewProps) {
                   📍 {m.location}
                 </div>
               )}
+              {notesFor(m.id).length > 0 && (
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    color: C.softInk,
+                    marginTop: 6,
+                    lineHeight: 1.45,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {notesFor(m.id)[0].body}
+                </div>
+              )}
             </div>
-            {m.source === 'google' && <GCalBadge />}
+            <SourceBadge source={m.source} account={accountEmail(m.accountId)} />
           </Card>
         ))}
         {todayMeetings.length === 0 && (

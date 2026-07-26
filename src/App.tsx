@@ -260,7 +260,14 @@ export function App() {
 
       <BottomNav view={view} wide={wide} onGo={go} />
 
-      {sheet && <Sheet state={sheet} onClose={() => setSheet(null)} wide={wide} />}
+      {sheet && (
+        <Sheet
+          state={sheet}
+          onClose={() => setSheet(null)}
+          onOpenSheet={setSheet}
+          wide={wide}
+        />
+      )}
 
       {searchOpen && (
         <Search

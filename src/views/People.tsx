@@ -1,11 +1,22 @@
-import { C, dashedBtn, SERIF } from '../tokens';
+import { ACCENT, C, dashedBtn, SERIF } from '../tokens';
 import { useStore } from '../store';
 import { shortDate } from '../lib/dates';
-import { Avatar, Card, EmptyState, PencilIcon, SectionHeader } from '../components/ui';
+import { Avatar, Card, EmptyState, PencilIcon, SectionHeader, TypeBadge } from '../components/ui';
 import type { ViewProps } from './types';
 
 export function People({ wide, openPerson, openSheet }: ViewProps) {
-  const { people } = useStore();
+  const { people, notes, meetings } = useStore();
+
+  /** Most recent contact, derived from linked notes and meetings. */
+  const lastContact = (personId: string): string | null => {
+    const dates = [
+      ...notes.filter((n) => n.personIds.includes(personId)).map((n) => n.date),
+      ...meetings
+        .filter((m) => m.personIds.includes(personId))
+        .map((m) => m.datetime.slice(0, 10)),
+    ].sort();
+    return dates.length ? dates[dates.length - 1] : null;
+  };
 
   return (
     <div
@@ -33,7 +44,7 @@ export function People({ wide, openPerson, openSheet }: ViewProps) {
               <div style={{ fontSize: 12.5, color: C.softInk, marginTop: 2 }}>{p.role}</div>
             )}
             <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
-              {p.log.length ? `Last: ${shortDate(p.log[0].at)}` : 'No interactions yet'}
+              {lastContact(p.id) ? `Last: ${shortDate(lastContact(p.id)!)}` : 'Nothing logged yet'}
             </div>
           </div>
           {p.followUp && (
@@ -66,9 +77,9 @@ export function People({ wide, openPerson, openSheet }: ViewProps) {
   );
 }
 
-export function PersonDetail({ wide, activePersonId, openSheet }: ViewProps) {
+export function PersonDetail({ wide, activePersonId, openSheet, openProject }: ViewProps) {
   const store = useStore();
-  const { people, meetings } = store;
+  const { people, meetings, notes, projects } = store;
   const person = people.find((p) => p.id === activePersonId);
   const index = people.findIndex((p) => p.id === activePersonId);
 
@@ -95,10 +106,14 @@ export function PersonDetail({ wide, activePersonId, openSheet }: ViewProps) {
     );
   }
 
-  // Meetings this person is linked to — a live relationship, not a kept list.
+  // Everything connected to this person, read live off the relationships (v5 §2).
   const theirMeetings = meetings
     .filter((m) => m.personIds.includes(person.id))
     .sort((a, b) => b.datetime.localeCompare(a.datetime));
+  const theirNotes = notes
+    .filter((n) => n.personIds.includes(person.id))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const theirProjects = projects.filter((p) => person.projectIds.includes(p.id));
 
   return (
     <div
@@ -169,68 +184,77 @@ export function PersonDetail({ wide, activePersonId, openSheet }: ViewProps) {
         {person.followUp ? '✓ Following up' : '＋ Flag for follow-up'}
       </button>
 
-      <SectionHeader title="Interaction log" meta={String(person.log.length)} />
-      <button
-        onClick={() =>
-          openSheet({
-            type: 'mini',
-            kind: 'log',
-            ctx: person.id,
-            title: 'Log an interaction',
-            label: 'What did you discuss?',
-            placeholder: 'e.g. Agreed on next steps…',
-          })
-        }
-        style={{ ...dashedBtn, marginBottom: 12, padding: '12px 14px' }}
-      >
-        ＋ Log an interaction
-      </button>
-
-      {person.log.length > 0 && (
-        <div style={{ position: 'relative', paddingLeft: 20 }}>
-          <div
-            style={{
-              position: 'absolute',
-              left: 5,
-              top: 6,
-              bottom: 6,
-              width: 2,
-              background: '#e2dbc9',
-            }}
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {person.log.map((l) => (
-              <div key={l.id} style={{ position: 'relative' }}>
-                <span
-                  style={{
-                    position: 'absolute',
-                    left: -19,
-                    top: 4,
-                    width: 10,
-                    height: 10,
-                    borderRadius: '50%',
-                    background: C.sage,
-                    border: `2px solid ${C.paper}`,
-                  }}
-                />
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: C.muted,
-                    fontWeight: 600,
-                    letterSpacing: '.02em',
-                  }}
-                >
-                  {shortDate(l.at)}
-                </div>
-                <div style={{ fontSize: 13.5, color: C.ink, lineHeight: 1.5, marginTop: 3 }}>
-                  {l.text}
-                </div>
+      {theirProjects.length > 0 && (
+        <>
+          <SectionHeader title="Projects" meta={String(theirProjects.length)} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {theirProjects.map((p) => (
+              <div
+                key={p.id}
+                onClick={() => openProject(p.id)}
+                style={{
+                  background: C.card,
+                  border: `1px solid ${C.cardBorder}`,
+                  borderLeft: `4px solid ${ACCENT[p.type]}`,
+                  borderRadius: 12,
+                  padding: '12px 13px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                }}
+              >
+                <span style={{ fontSize: 14, fontWeight: 600, flex: 1, minWidth: 0 }}>{p.name}</span>
+                <TypeBadge type={p.type} />
               </div>
             ))}
           </div>
-        </div>
+        </>
       )}
+
+      {/* Notes replace the old interaction log: same running history, but each
+          entry is a real note that also shows in Notes and can carry a project
+          or meeting. */}
+      <>
+          <SectionHeader title="Notes" meta={String(theirNotes.length)} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {theirNotes.map((n) => (
+              <div
+                key={n.id}
+                onClick={() => openSheet({ type: 'note', noteId: n.id })}
+                style={{
+                  background: C.card,
+                  border: `1px solid ${C.cardBorder}`,
+                  borderRadius: 12,
+                  padding: '12px 13px',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{n.title}</div>
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    color: C.softInk,
+                    lineHeight: 1.45,
+                    marginTop: 4,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {n.body}
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={() => openSheet({ type: 'note', personId: person.id })}
+              style={dashedBtn}
+            >
+              ＋ Add a note
+            </button>
+          </div>
+        </>
 
       {theirMeetings.length > 0 && (
         <>
