@@ -3,13 +3,21 @@ import { C, primaryBtn, SERIF } from '../tokens';
 import { useStore } from '../store';
 import { clearAll } from '../db';
 import { shortDate } from '../lib/dates';
-import { dataSummary, downloadBackup, ImportError, importBackup } from '../lib/backup';
+import {
+  dataSummary,
+  downloadBackup,
+  ImportError,
+  importBackup,
+  importContacts,
+} from '../lib/backup';
 
 export function Settings() {
   const store = useStore();
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [confirmClear, setConfirmClear] = useState(false);
+  const [contactReport, setContactReport] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const contactsRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void dataSummary().then(setCounts);
@@ -22,6 +30,27 @@ export function Settings() {
       store.showToast('Backup restored');
     } catch (e) {
       store.showToast(e instanceof ImportError ? e.message : 'Could not read that file');
+    }
+  };
+
+  const onImportContacts = async (file: File) => {
+    try {
+      const { added, skipped } = await importContacts(await file.text());
+      await store.reload();
+      const parts = [`Added ${added} ${added === 1 ? 'person' : 'people'}`];
+      if (skipped.length) {
+        parts.push(
+          `skipped ${skipped.length} already here (${skipped.slice(0, 3).join(', ')}${
+            skipped.length > 3 ? `, +${skipped.length - 3} more` : ''
+          })`,
+        );
+      }
+      setContactReport(`${parts.join(' · ')}.`);
+      store.showToast(`Imported ${added} ${added === 1 ? 'contact' : 'contacts'}`);
+    } catch (e) {
+      const msg = e instanceof ImportError ? e.message : 'Could not read that file';
+      setContactReport(msg);
+      store.showToast(msg);
     }
   };
 
@@ -92,6 +121,48 @@ export function Settings() {
         <p style={{ fontSize: 11.5, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>
           Restoring replaces everything currently in the app.
         </p>
+      </div>
+
+      <div style={h}>Contacts</div>
+      <div style={panel}>
+        <p style={{ fontSize: 13.5, color: C.softInk, lineHeight: 1.55 }}>
+          Bring in a batch of people from a JSON file. Anyone whose name is already here is skipped,
+          so re-importing the same file won't duplicate anyone or overwrite an interaction log.
+        </p>
+        <button
+          onClick={() => contactsRef.current?.click()}
+          style={{
+            width: '100%',
+            marginTop: 14,
+            background: C.card,
+            color: C.softInk,
+            border: `1px solid ${C.line}`,
+            borderRadius: 12,
+            padding: 13,
+            fontFamily: 'inherit',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Import contacts
+        </button>
+        <input
+          ref={contactsRef}
+          type="file"
+          accept="application/json,.json"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void onImportContacts(f);
+            e.target.value = '';
+          }}
+        />
+        {contactReport && (
+          <p style={{ fontSize: 12.5, color: C.softInk, marginTop: 10, lineHeight: 1.5 }}>
+            {contactReport}
+          </p>
+        )}
       </div>
 
       <div style={h}>Calendars</div>
