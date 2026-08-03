@@ -140,7 +140,7 @@ export function PersonPicker({
                   borderBottom: `1px solid ${C.paper2}`,
                 }}
               >
-                <Avatar name={p.name} seed={p.id} size={28} />
+                <Avatar name={p.name} size={28} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: C.ink }}>{p.name}</div>
                   {p.role && (

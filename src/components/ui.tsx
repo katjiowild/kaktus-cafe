@@ -378,33 +378,13 @@ export function PersonIcon({ size = 18 }: { size?: number }) {
 }
 
 /**
- * Stable small hash, so a person's colour depends on who they are.
- *
- * The trailing avalanche matters: a plain `h * 31 + c` collapses badly here,
- * because 31 ≡ 1 (mod 3) makes the result mod 3 nothing more than a character
- * sum — similar ids then all land on the same colour.
+ * One colour for everyone. The design cycled three palette colours by list
+ * position, but it signified nothing — and once People became sortable, a
+ * positional colour would shift as you re-sort and disagree with the person's
+ * own detail page. Rather than keep a meaningless variable and work to make it
+ * stable, it's gone: gold, always.
  */
-function seedIndex(seed: string, buckets: number): number {
-  let h = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  h ^= h >>> 16;
-  h = Math.imul(h, 2246822507);
-  h ^= h >>> 13;
-  return Math.abs(h) % buckets;
-}
-
-/**
- * Avatar colour is keyed to the person's id, not their position in a list.
- * Position worked while People had one fixed order; now that the list can be
- * sorted and filtered, a positional colour would change as you re-sort and
- * disagree with the same person's detail page.
- */
-export function Avatar({ name, seed, size = 44 }: { name: string; seed: string; size?: number }) {
-  const colors = [C.sage, C.clay, C.gold];
-  const index = seedIndex(seed, colors.length);
+export function Avatar({ name, size = 44 }: { name: string; size?: number }) {
   return (
     <div
       style={{
@@ -412,14 +392,15 @@ export function Avatar({ name, seed, size = 44 }: { name: string; seed: string; 
         width: size,
         height: size,
         borderRadius: '50%',
-        color: index % 3 === 2 ? '#3a2f10' : C.paper,
+        // Gold is light; dark ink keeps the initial legible.
+        color: '#3a2f10',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         fontFamily: SERIF,
         fontSize: size * 0.41,
         fontWeight: 500,
-        background: colors[index % 3],
+        background: C.gold,
       }}
     >
       {(name.trim()[0] || '?').toUpperCase()}

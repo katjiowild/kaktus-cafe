@@ -113,7 +113,7 @@ export function People({ wide, openPerson, openSheet }: ViewProps) {
           onClick={() => openPerson(p.id)}
           style={{ padding: '13px 15px', display: 'flex', gap: 13, alignItems: 'center' }}
         >
-          <Avatar name={p.name} seed={p.id} />
+          <Avatar name={p.name} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: 15 }}>{p.name}</div>
             {p.role && (
@@ -231,7 +231,7 @@ export function PersonDetail({ wide, activePersonId, openSheet, openProject }: V
         >
           <PencilIcon />
         </button>
-        <Avatar name={person.name} seed={person.id} size={56} />
+        <Avatar name={person.name} size={56} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 500 }}>{person.name}</div>
           {person.role && (
