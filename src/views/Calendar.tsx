@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { C, SERIF } from '../tokens';
 import { useAccountEmail, useStore } from '../store';
 import { isoDate, timeLabel } from '../lib/dates';
+import { sortOpenTasks } from '../lib/derive';
 import { SourceBadge } from '../components/ui';
 import type { ViewProps } from './types';
 
@@ -40,7 +41,7 @@ export function Calendar({ wide, openSheet }: ViewProps) {
   const dayMeetings = meetings
     .filter((m) => m.datetime.slice(0, 10) === selected)
     .sort((a, b) => a.datetime.localeCompare(b.datetime));
-  const dayTasks = tasks.filter((t) => t.dueDate === selected && !t.archived);
+  const dayTasks = sortOpenTasks(tasks.filter((t) => t.dueDate === selected && !t.archived));
 
   const selDate = new Date(`${selected}T00:00`);
   const selLabel =
@@ -222,7 +223,7 @@ export function Calendar({ wide, openSheet }: ViewProps) {
               />
               <span style={{ flex: 1, fontSize: 14 }}>{t.title}</span>
               <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 600 }}>
-                {t.done ? 'Done' : 'Task'}
+                {t.done ? 'Done' : (t.dueTime ?? 'Task')}
               </span>
             </div>
           ))}

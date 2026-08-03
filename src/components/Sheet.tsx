@@ -236,6 +236,7 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
     existing?.projectId ?? state.projectId ?? null,
   );
   const [dueDate, setDueDate] = useState<string>(existing?.dueDate ?? isoDate());
+  const [dueTime, setDueTime] = useState<string>(existing?.dueTime ?? '');
   const [recurrence, setRecurrence] = useState<Recurrence | null>(existing?.recurrence ?? null);
   const [urgent, setUrgent] = useState<boolean>(existing?.urgent ?? false);
   const [newSub, setNewSub] = useState('');
@@ -255,6 +256,7 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
         title: t,
         projectId,
         dueDate: dueDate || null,
+        dueTime: dueTime || null,
         recurrence,
         urgent,
       });
@@ -264,6 +266,7 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
         title: t,
         projectId,
         dueDate: dueDate || null,
+        dueTime: dueTime || null,
         recurrence,
         urgent,
       });
@@ -285,8 +288,26 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
       </Field>
 
       <Field>
-        <label style={label}>Due</label>
-        <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={input} />
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <label style={label}>Due</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              style={input}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={label}>Time (optional)</label>
+            <input
+              type="time"
+              value={dueTime}
+              onChange={(e) => setDueTime(e.target.value)}
+              style={input}
+            />
+          </div>
+        </div>
       </Field>
 
       <Field>
