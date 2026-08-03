@@ -5,6 +5,7 @@ import { isoDate, WEEKDAY_LETTERS } from '../lib/dates';
 import type { Cadence, ProjectType, Recurrence } from '../types';
 import { Checkbox, ToggleRow } from './ui';
 import { PersonPicker } from './PersonPicker';
+import { Linkify } from './Linkify';
 import { canWrite } from '../lib/googleAuth';
 
 export type SheetState =
@@ -857,7 +858,7 @@ function MeetingSheet({
                 overflow: 'hidden',
               }}
             >
-              {n.body}
+              <Linkify text={n.body} />
             </div>
           </div>
         ))}
