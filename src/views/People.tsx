@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ACCENT, C, dashedBtn, SERIF } from '../tokens';
 import { useStore } from '../store';
 import { shortDate } from '../lib/dates';
@@ -5,8 +6,14 @@ import { Avatar, Card, EmptyState, PencilIcon, SectionHeader, TypeBadge } from '
 import type { ViewProps } from './types';
 import { Linkify } from '../components/Linkify';
 
+type PeopleSort = 'name' | 'updated';
+
 export function People({ wide, openPerson, openSheet }: ViewProps) {
   const { people, notes, meetings } = useStore();
+
+  // Sort and filter are independent: either can be used alone or together.
+  const [sort, setSort] = useState<PeopleSort>('name');
+  const [followUpOnly, setFollowUpOnly] = useState(false);
 
   /** Most recent contact, derived from linked notes and meetings. */
   const lastContact = (personId: string): string | null => {
@@ -18,6 +25,37 @@ export function People({ wide, openPerson, openSheet }: ViewProps) {
     ].sort();
     return dates.length ? dates[dates.length - 1] : null;
   };
+
+  const shown = people
+    .filter((p) => !followUpOnly || p.followUp)
+    .slice()
+    .sort((a, b) =>
+      sort === 'name'
+        ? a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        : b.updatedAt.localeCompare(a.updatedAt),
+    );
+
+  const followUpCount = people.filter((p) => p.followUp).length;
+
+  const controlRow: React.CSSProperties = {
+    display: 'flex',
+    gap: 6,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    margin: '0 2px 2px',
+  };
+  const chip = (on: boolean): React.CSSProperties => ({
+    border: `1px solid ${on ? C.deepSage : C.line}`,
+    background: on ? C.deepSage : C.card,
+    color: on ? C.paper : C.softInk,
+    borderRadius: 20,
+    padding: '6px 12px',
+    fontSize: 12.5,
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    whiteSpace: 'nowrap',
+  });
 
   return (
     <div
@@ -32,13 +70,50 @@ export function People({ wide, openPerson, openSheet }: ViewProps) {
           : {}),
       }}
     >
-      {people.map((p, i) => (
+      {people.length > 0 && (
+        <div style={controlRow}>
+          {/* Sort — one of two, always active */}
+          <div style={{ display: 'flex', gap: 6 }} role="group" aria-label="Sort people">
+            <button
+              onClick={() => setSort('name')}
+              aria-pressed={sort === 'name'}
+              style={chip(sort === 'name')}
+            >
+              A–Z
+            </button>
+            <button
+              onClick={() => setSort('updated')}
+              aria-pressed={sort === 'updated'}
+              style={chip(sort === 'updated')}
+            >
+              Recently updated
+            </button>
+          </div>
+
+          {/* Filter — independent of the sort above */}
+          <button
+            onClick={() => setFollowUpOnly((f) => !f)}
+            aria-pressed={followUpOnly}
+            style={{
+              ...chip(followUpOnly),
+              marginLeft: 'auto',
+              ...(followUpOnly
+                ? {}
+                : { borderColor: '#e6c9bd', color: C.clay, background: C.card }),
+            }}
+          >
+            Follow-up{followUpCount > 0 ? ` (${followUpCount})` : ''}
+          </button>
+        </div>
+      )}
+
+      {shown.map((p) => (
         <Card
           key={p.id}
           onClick={() => openPerson(p.id)}
           style={{ padding: '13px 15px', display: 'flex', gap: 13, alignItems: 'center' }}
         >
-          <Avatar name={p.name} index={i} />
+          <Avatar name={p.name} seed={p.id} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: 15 }}>{p.name}</div>
             {p.role && (
@@ -69,6 +144,9 @@ export function People({ wide, openPerson, openSheet }: ViewProps) {
       {people.length === 0 && (
         <EmptyState>No one here yet. Tap + to add someone you've met.</EmptyState>
       )}
+      {people.length > 0 && shown.length === 0 && (
+        <EmptyState>No one is flagged for follow-up right now.</EmptyState>
+      )}
       {!wide && people.length > 0 && (
         <button onClick={() => openSheet({ type: 'person' })} style={{ ...dashedBtn, marginTop: 2 }}>
           ＋ Add a person
@@ -82,7 +160,6 @@ export function PersonDetail({ wide, activePersonId, openSheet, openProject }: V
   const store = useStore();
   const { people, meetings, notes, projects } = store;
   const person = people.find((p) => p.id === activePersonId);
-  const index = people.findIndex((p) => p.id === activePersonId);
 
   if (!person) {
     return (
@@ -154,7 +231,7 @@ export function PersonDetail({ wide, activePersonId, openSheet, openProject }: V
         >
           <PencilIcon />
         </button>
-        <Avatar name={person.name} index={index} size={56} />
+        <Avatar name={person.name} seed={person.id} size={56} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 500 }}>{person.name}</div>
           {person.role && (
