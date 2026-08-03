@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ACCENT, C, dashedBtn, SERIF } from '../tokens';
 import { useStore } from '../store';
-import { shortDate } from '../lib/dates';
+import { isoDate, shortDate } from '../lib/dates';
 import { Avatar, Card, EmptyState, PencilIcon, SectionHeader, TypeBadge } from '../components/ui';
 import type { ViewProps } from './types';
 import { Linkify } from '../components/Linkify';
@@ -15,14 +15,23 @@ export function People({ wide, openPerson, openSheet }: ViewProps) {
   const [sort, setSort] = useState<PeopleSort>('name');
   const [followUpOnly, setFollowUpOnly] = useState(false);
 
-  /** Most recent contact, derived from linked notes and meetings. */
+  /**
+   * Most recent contact, derived from linked notes and meetings.
+   *
+   * Only dates up to today count. Calendar sync pulls events up to 60 days
+   * ahead, so without the clamp an upcoming meeting would show as "Last:" —
+   * a date that hasn't happened yet.
+   */
+  const todayIso = isoDate();
   const lastContact = (personId: string): string | null => {
     const dates = [
       ...notes.filter((n) => n.personIds.includes(personId)).map((n) => n.date),
       ...meetings
         .filter((m) => m.personIds.includes(personId))
         .map((m) => m.datetime.slice(0, 10)),
-    ].sort();
+    ]
+      .filter((d) => d <= todayIso)
+      .sort();
     return dates.length ? dates[dates.length - 1] : null;
   };
 
