@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { shortDate } from '../lib/dates';
 import { Avatar, Card, EmptyState, PencilIcon, SectionHeader, TypeBadge } from '../components/ui';
 import type { ViewProps } from './types';
+import { Linkify } from '../components/Linkify';
 
 export function People({ wide, openPerson, openSheet }: ViewProps) {
   const { people, notes, meetings } = useStore();
@@ -157,10 +158,12 @@ export function PersonDetail({ wide, activePersonId, openSheet, openProject }: V
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 500 }}>{person.name}</div>
           {person.role && (
-            <div style={{ fontSize: 13, color: C.softInk, marginTop: 3 }}>{person.role}</div>
+            <div style={{ fontSize: 13, color: C.softInk, marginTop: 3 }}>
+              <Linkify text={person.role} />
+            </div>
           )}
           <div style={{ fontSize: 12.5, color: C.muted, marginTop: 6, lineHeight: 1.4 }}>
-            How we met: {person.howMet || '—'}
+            How we met: {person.howMet ? <Linkify text={person.howMet} /> : '—'}
           </div>
         </div>
       </div>
@@ -243,7 +246,7 @@ export function PersonDetail({ wide, activePersonId, openSheet, openProject }: V
                     overflow: 'hidden',
                   }}
                 >
-                  {n.body}
+                  <Linkify text={n.body} />
                 </div>
               </div>
             ))}

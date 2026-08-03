@@ -6,6 +6,7 @@ import { Plant } from '../components/Plant';
 import { TaskRow } from '../components/TaskRow';
 import { Checkbox, PencilIcon, SectionHeader, TypeBadge } from '../components/ui';
 import type { ViewProps } from './types';
+import { Linkify } from '../components/Linkify';
 
 export function ProjectDetail({ wide, activeProjectId, openSheet, go }: ViewProps) {
   const store = useStore();
@@ -90,7 +91,11 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, go }: ViewProp
             label={project.type === 'active' ? 'Active project' : undefined}
           />
           <div style={{ fontSize: 13, color: C.softInk, marginTop: 10, lineHeight: 1.45 }}>
-            {project.description.trim() || 'Add a description…'}
+            {project.description.trim() ? (
+              <Linkify text={project.description} />
+            ) : (
+              'Add a description…'
+            )}
           </div>
           {project.type === 'active' && (project.startDate || project.endDate) && (
             <div
@@ -384,7 +389,7 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, go }: ViewProp
                 overflow: 'hidden',
               }}
             >
-              {n.body}
+              <Linkify text={n.body} />
             </div>
           </div>
         ))}
@@ -401,7 +406,9 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, go }: ViewProp
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {project.comments.map((c) => (
           <div key={c.id} style={{ background: '#efe9dc', borderRadius: 12, padding: '12px 13px' }}>
-            <div style={{ fontSize: 13, color: C.ink, lineHeight: 1.5 }}>{c.text}</div>
+            <div style={{ fontSize: 13, color: C.ink, lineHeight: 1.5 }}>
+              <Linkify text={c.text} />
+            </div>
             <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginTop: 6 }}>
               {shortDate(c.at)}
             </div>

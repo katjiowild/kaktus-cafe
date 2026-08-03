@@ -2,15 +2,26 @@ import type { Note, Project, Task } from '../types';
 import { addDays, addMonths, daysSince, isOverdue, parseDate, today } from './dates';
 
 /**
- * The one sort order for open tasks, used by both Today and All tasks (v5 §1).
- * Urgent floats to the top; within each group the existing due-date order is
- * preserved, so marking something urgent reorders it without scrambling the
- * rest of the list. Undated tasks sink to the bottom of their group.
+ * The one sort order for open tasks, used by both Today and All tasks
+ * (v5 §1, extended v7 §2).
+ *
+ *   urgent first → then by date → then by time within that date
+ *
+ * Time is a tiebreaker inside a day, not a replacement for the date: Today's
+ * list mixes overdue items with today's, and overdue floating to the top is an
+ * established signal that a time shouldn't override. Untimed tasks sit after
+ * timed ones on the same date — a time is a commitment at a moment, untimed is
+ * "sometime today".
  */
 export function sortOpenTasks(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => {
     if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
-    return (a.dueDate ?? '9999-99-99').localeCompare(b.dueDate ?? '9999-99-99');
+    const byDate = (a.dueDate ?? '9999-99-99').localeCompare(b.dueDate ?? '9999-99-99');
+    if (byDate !== 0) return byDate;
+    if (a.dueTime && b.dueTime) return a.dueTime.localeCompare(b.dueTime);
+    if (a.dueTime) return -1;
+    if (b.dueTime) return 1;
+    return 0;
   });
 }
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { C, SERIF } from '../tokens';
 import { useAccountEmail, useStore } from '../store';
 import { isoDate, timeLabel } from '../lib/dates';
+import { sortOpenTasks } from '../lib/derive';
 import { SourceBadge } from '../components/ui';
 import type { ViewProps } from './types';
 
@@ -40,7 +41,35 @@ export function Calendar({ wide, openSheet }: ViewProps) {
   const dayMeetings = meetings
     .filter((m) => m.datetime.slice(0, 10) === selected)
     .sort((a, b) => a.datetime.localeCompare(b.datetime));
-  const dayTasks = tasks.filter((t) => t.dueDate === selected && !t.archived);
+  const dayTasks = sortOpenTasks(tasks.filter((t) => t.dueDate === selected && !t.archived));
+
+  /**
+   * Unlike Today — which has separate Meetings and Tasks sections — the day
+   * agenda is one continuous list, so meetings and tasks belong in a single
+   * chronological order. Untimed tasks fall to the end, matching how the task
+   * lists treat them.
+   */
+  const UNTIMED = '99:99';
+  const agenda = [
+    ...dayMeetings.map((m) => ({
+      kind: 'meeting' as const,
+      key: m.id,
+      at: timeLabel(m.datetime),
+      meeting: m,
+    })),
+    ...dayTasks.map((t) => ({
+      kind: 'task' as const,
+      key: t.id,
+      at: t.dueTime ?? UNTIMED,
+      task: t,
+    })),
+  ].sort((a, b) => {
+    const byTime = a.at.localeCompare(b.at);
+    if (byTime !== 0) return byTime;
+    // At the same minute, the meeting is the fixed commitment — show it first.
+    if (a.kind !== b.kind) return a.kind === 'meeting' ? -1 : 1;
+    return 0;
+  });
 
   const selDate = new Date(`${selected}T00:00`);
   const selLabel =
@@ -165,67 +194,78 @@ export function Calendar({ wide, openSheet }: ViewProps) {
           {selLabel}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-          {dayMeetings.map((m) => (
-            <div
-              key={m.id}
-              onClick={() => openSheet({ type: 'meeting', meetingId: m.id })}
-              style={{
-                background: C.card,
-                border: `1px solid ${C.cardBorder}`,
-                borderRadius: 12,
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 11,
-                cursor: 'pointer',
-              }}
-            >
-              <span
+          {agenda.map((entry) =>
+            entry.kind === 'meeting' ? (
+              <div
+                key={entry.key}
+                onClick={() => openSheet({ type: 'meeting', meetingId: entry.meeting.id })}
                 style={{
-                  width: 9,
-                  height: 9,
-                  borderRadius: '50%',
-                  flexShrink: 0,
-                  background: C.clay,
+                  background: C.card,
+                  border: `1px solid ${C.cardBorder}`,
+                  borderRadius: 12,
+                  padding: '12px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 11,
+                  cursor: 'pointer',
                 }}
-              />
-              <span style={{ flex: 1, fontSize: 14 }}>{m.title}</span>
-              <SourceBadge source={m.source} account={accountEmail(m.accountId)} />
-              <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 600 }}>
-                {timeLabel(m.datetime)}
-              </span>
-            </div>
-          ))}
-          {dayTasks.map((t) => (
-            <div
-              key={t.id}
-              onClick={() => openSheet({ type: 'task', taskId: t.id })}
-              style={{
-                background: C.card,
-                border: `1px solid ${C.cardBorder}`,
-                borderRadius: 12,
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 11,
-                cursor: 'pointer',
-              }}
-            >
-              <span
+              >
+                <span
+                  style={{
+                    width: 9,
+                    height: 9,
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                    background: C.clay,
+                  }}
+                />
+                <span style={{ flex: 1, fontSize: 14 }}>{entry.meeting.title}</span>
+                <SourceBadge
+                  source={entry.meeting.source}
+                  account={accountEmail(entry.meeting.accountId)}
+                />
+                <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 600 }}>{entry.at}</span>
+              </div>
+            ) : (
+              <div
+                key={entry.key}
+                onClick={() => openSheet({ type: 'task', taskId: entry.task.id })}
                 style={{
-                  width: 9,
-                  height: 9,
-                  borderRadius: '50%',
-                  flexShrink: 0,
-                  background: C.sage,
+                  background: C.card,
+                  border: `1px solid ${C.cardBorder}`,
+                  borderRadius: 12,
+                  padding: '12px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 11,
+                  cursor: 'pointer',
                 }}
-              />
-              <span style={{ flex: 1, fontSize: 14 }}>{t.title}</span>
-              <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 600 }}>
-                {t.done ? 'Done' : 'Task'}
-              </span>
-            </div>
-          ))}
+              >
+                <span
+                  style={{
+                    width: 9,
+                    height: 9,
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                    background: C.sage,
+                  }}
+                />
+                <span
+                  style={{
+                    flex: 1,
+                    fontSize: 14,
+                    textDecoration: entry.task.done ? 'line-through' : 'none',
+                    color: entry.task.done ? C.muted : C.ink,
+                  }}
+                >
+                  {entry.task.title}
+                </span>
+                <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 600 }}>
+                  {entry.task.done ? 'Done' : (entry.task.dueTime ?? 'Task')}
+                </span>
+              </div>
+            ),
+          )}
           {dayMeetings.length === 0 && dayTasks.length === 0 && (
             <div style={{ textAlign: 'center', padding: 22, color: C.muted, fontSize: 13.5 }}>
               Nothing planned for this day.

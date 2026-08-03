@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { shortDate } from '../lib/dates';
 import { Card, EmptyState, PencilIcon, PinIcon } from '../components/ui';
 import type { ViewProps } from './types';
+import { Linkify } from '../components/Linkify';
 
 export function Notes({ openSheet, wide }: ViewProps) {
   const store = useStore();
@@ -93,7 +94,7 @@ export function Notes({ openSheet, wide }: ViewProps) {
                       }),
                 }}
               >
-                {n.body}
+                <Linkify text={n.body} />
               </div>
               {canExpand && (
                 <span

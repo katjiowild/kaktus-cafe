@@ -7,6 +7,7 @@ import { Plant } from '../components/Plant';
 import { TaskRow } from '../components/TaskRow';
 import { Card, EmptyState, SourceBadge } from '../components/ui';
 import type { ViewProps } from './types';
+import { Linkify } from '../components/Linkify';
 
 export function Today({ openProject, openSheet }: ViewProps) {
   const store = useStore();
@@ -136,7 +137,7 @@ export function Today({ openProject, openSheet }: ViewProps) {
                     gap: 4,
                   }}
                 >
-                  📍 {m.location}
+                  📍 <Linkify text={m.location} />
                 </div>
               )}
               {notesFor(m.id).length > 0 && (

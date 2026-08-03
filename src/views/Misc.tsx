@@ -5,6 +5,7 @@ import { projectMeta, VITALITY_LABEL, type Vitality } from '../lib/derive';
 import { Plant } from '../components/Plant';
 import { Card, EmptyState, PersonIcon, SourceBadge, TypeBadge } from '../components/ui';
 import type { View, ViewProps } from './types';
+import { Linkify } from '../components/Linkify';
 
 // ---------------- Meetings ----------------
 
@@ -83,7 +84,7 @@ export function Meetings({ openSheet }: ViewProps) {
                     gap: 4,
                   }}
                 >
-                  📍 {m.location}
+                  📍 <Linkify text={m.location} />
                 </div>
               )}
               {notesFor(m.id).length > 0 && (

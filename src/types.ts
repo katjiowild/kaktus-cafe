@@ -65,6 +65,8 @@ export interface Task {
   projectId: string | null;
   /** ISO date (yyyy-mm-dd). */
   dueDate: string | null;
+  /** Optional time of day, "HH:MM" (v7 §2). Timeboxes a task within its day. */
+  dueTime: string | null;
   done: boolean;
   /** Floats the task to the top of every list, ahead of the due-date order (v5 §1). */
   urgent: boolean;

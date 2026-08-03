@@ -136,6 +136,19 @@ class KaktusDB extends Dexie {
           delete (p as Person & { log?: unknown }).log;
         });
       });
+
+    // v7 — optional Task.dueTime, backfilled to null so existing tasks read as
+    // untimed rather than undefined.
+    this.version(7)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx
+          .table<Task>('tasks')
+          .toCollection()
+          .modify((t) => {
+            if (t.dueTime === undefined) t.dueTime = null;
+          });
+      });
   }
 }
 

@@ -74,6 +74,7 @@ export function TaskRow({
                 }}
               >
                 {dueLabel(task.dueDate)}
+                {task.dueTime ? ` · ${task.dueTime}` : ''}
               </span>
               {task.subtasks.length > 0 && (
                 <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 600 }}>

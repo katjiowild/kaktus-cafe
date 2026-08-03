@@ -89,6 +89,7 @@ export interface Store extends Data {
     title: string;
     projectId: string | null;
     dueDate: string | null;
+    dueTime?: string | null;
     recurrence: Recurrence | null;
     urgent?: boolean;
   }) => Promise<void>;
@@ -309,6 +310,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             title: cad === 'weekly' ? 'Weekly check-in' : 'Monthly check-in',
             projectId: id,
             dueDate: isoDate(),
+            dueTime: null,
             done: false,
             urgent: false,
             completedAt: null,
@@ -442,13 +444,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       // ---------- Tasks ----------
-      async createTask({ title, projectId, dueDate, recurrence, urgent }) {
+      async createTask({ title, projectId, dueDate, dueTime, recurrence, urgent }) {
         const now = isoNow();
         await db.tasks.add({
           id: uid('task'),
           title,
           projectId,
           dueDate,
+          dueTime: dueTime ?? null,
           done: false,
           urgent: urgent ?? false,
           completedAt: null,
@@ -504,6 +507,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               title: t.title,
               projectId: t.projectId,
               dueDate: isoDate(next),
+              // A 07:00 walk stays a 07:00 walk next time.
+              dueTime: t.dueTime,
               done: false,
               // Urgency carries to the next occurrence — if watering the plants
               // is urgent this week, it's the kind of thing that stays urgent.
