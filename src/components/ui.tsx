@@ -377,8 +377,14 @@ export function PersonIcon({ size = 18 }: { size?: number }) {
   );
 }
 
-export function Avatar({ name, index, size = 44 }: { name: string; index: number; size?: number }) {
-  const colors = [C.sage, C.clay, C.gold];
+/**
+ * One colour for everyone. The design cycled three palette colours by list
+ * position, but it signified nothing — and once People became sortable, a
+ * positional colour would shift as you re-sort and disagree with the person's
+ * own detail page. Rather than keep a meaningless variable and work to make it
+ * stable, it's gone: gold, always.
+ */
+export function Avatar({ name, size = 44 }: { name: string; size?: number }) {
   return (
     <div
       style={{
@@ -386,14 +392,15 @@ export function Avatar({ name, index, size = 44 }: { name: string; index: number
         width: size,
         height: size,
         borderRadius: '50%',
-        color: index % 3 === 2 ? '#3a2f10' : C.paper,
+        // Gold is light; dark ink keeps the initial legible.
+        color: '#3a2f10',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         fontFamily: SERIF,
         fontSize: size * 0.41,
         fontWeight: 500,
-        background: colors[index % 3],
+        background: C.gold,
       }}
     >
       {(name.trim()[0] || '?').toUpperCase()}
