@@ -16,6 +16,30 @@ const DAYS_FORWARD = 60;
 
 export const ACCOUNTS_KEY = 'calendarAccounts';
 
+/**
+ * Everything that reads-then-writes the meeting table against a provider runs
+ * through here, one at a time.
+ *
+ * Two races produced duplicate meetings without it:
+ *  - Pushing a new meeting creates the Google event first and tags the local
+ *    record second. A sync landing in that gap saw an untagged local record,
+ *    decided the event was new, and inserted a second copy.
+ *  - Nothing serialised sync with itself. Two overlapping runs both read the
+ *    existing meetings before either wrote, so both inserted — which is how one
+ *    event became five.
+ */
+let syncChain: Promise<unknown> = Promise.resolve();
+
+export function withCalendarLock<T>(fn: () => Promise<T>): Promise<T> {
+  // Chain regardless of whether the previous holder resolved or threw.
+  const run = syncChain.then(fn, fn);
+  syncChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 export async function loadAccounts(): Promise<CalendarAccount[]> {
   const row = await db.settings.get(ACCOUNTS_KEY);
   return (row?.value as CalendarAccount[] | undefined) ?? [];
@@ -208,14 +232,68 @@ export interface SyncResult {
   removed: number;
 }
 
+/**
+ * Collapse meetings that already share an `externalId` within one account —
+ * the wreckage left by the races above, which sync would otherwise preserve
+ * forever (both copies match a real event, so neither looks stale).
+ *
+ * Keeps one record and re-points any notes from the copies onto it, so a
+ * write-up attached to the "wrong" duplicate isn't lost.
+ */
+async function collapseDuplicates(accountId: string): Promise<number> {
+  const mine = await db.meetings.where('accountId').equals(accountId).toArray();
+  const groups = new Map<string, Meeting[]>();
+  for (const m of mine) {
+    if (!m.externalId) continue;
+    const list = groups.get(m.externalId) ?? [];
+    list.push(m);
+    groups.set(m.externalId, list);
+  }
+
+  let removed = 0;
+  for (const [, copies] of groups) {
+    if (copies.length < 2) continue;
+    // Keep the oldest — the original the user actually created.
+    const ordered = [...copies].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const keep = ordered[0];
+    const drop = ordered.slice(1);
+
+    for (const d of drop) {
+      const theirNotes = await db.notes.where('meetingId').equals(d.id).toArray();
+      await Promise.all(
+        theirNotes.map((n) => db.notes.update(n.id, { meetingId: keep.id, updatedAt: isoNow() })),
+      );
+    }
+    await db.meetings.bulkDelete(drop.map((d) => d.id));
+    removed += drop.length;
+  }
+  return removed;
+}
+
 export async function syncAccount(account: CalendarAccount): Promise<SyncResult> {
   const token = await freshToken(account);
   const events =
     account.provider === 'google' ? await fetchGoogle(token) : await fetchOutlook(token);
 
   const people = await db.people.toArray();
+  await collapseDuplicates(account.id);
+
   const existing = await db.meetings.where('accountId').equals(account.id).toArray();
   const byExternal = new Map(existing.map((m) => [m.externalId ?? '', m]));
+
+  /**
+   * Meetings pushed to this account whose local record never got tagged —
+   * because the app closed between creating the Google event and adopting it.
+   * The lock can't cover that, so match them here on title + start time and
+   * adopt rather than inserting a duplicate.
+   */
+  const orphans = (await db.meetings.where('source').equals('local').toArray()).filter(
+    (m) => m.externalId === null,
+  );
+  const orphanKey = (title: string, datetime: string) =>
+    `${title.trim().toLowerCase()}@${new Date(datetime).getTime()}`;
+  const byOrphan = new Map(orphans.map((m) => [orphanKey(m.title, m.datetime), m]));
+
   const seen = new Set<string>();
   const now = isoNow();
 
@@ -235,6 +313,18 @@ export async function syncAccount(account: CalendarAccount): Promise<SyncResult>
         location: e.location,
         personIds: prev.personIds.length ? prev.personIds : personIds,
         peopleText: prev.peopleText || peopleText,
+        updatedAt: now,
+      });
+      updated++;
+    } else if (byOrphan.has(orphanKey(e.title, e.datetime))) {
+      // This is our own push that never finished being adopted — claim it.
+      const orphan = byOrphan.get(orphanKey(e.title, e.datetime))!;
+      byOrphan.delete(orphanKey(e.title, e.datetime));
+      await db.meetings.update(orphan.id, {
+        source: account.provider,
+        externalId: e.externalId,
+        accountId: account.id,
+        location: e.location,
         updatedAt: now,
       });
       updated++;
@@ -282,7 +372,12 @@ export async function syncAccount(account: CalendarAccount): Promise<SyncResult>
   return { added, updated, removed: inWindow.length };
 }
 
-export async function syncAll(): Promise<{ result: SyncResult; errors: string[] }> {
+export function syncAll(): Promise<{ result: SyncResult; errors: string[] }> {
+  // Serialised: never overlaps another sync, nor an in-flight push.
+  return withCalendarLock(runSyncAll);
+}
+
+async function runSyncAll(): Promise<{ result: SyncResult; errors: string[] }> {
   const accounts = await loadAccounts();
   const total: SyncResult = { added: 0, updated: 0, removed: 0 };
   const errors: string[] = [];

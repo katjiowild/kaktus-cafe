@@ -11,6 +11,7 @@ import { db, getSetting, setSetting, uid } from './db';
 import { isoDate, isoNow, nextOccurrence, parseDate, today } from './lib/dates';
 import {
   createGoogleEvent,
+  withCalendarLock,
   disconnectAccount,
   getDefaultWriteAccountId,
   loadAccounts,
@@ -662,22 +663,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return;
         }
         try {
-          const { externalId } = await createGoogleEvent(account, {
-            title,
-            datetime,
-            location,
-            peopleText,
-          });
-          // Adopt it as the account's event. Without this the next sync would
-          // pull the same event back in as a second, duplicate meeting — and
-          // because the app never pushes edits, letting it stay locally
-          // editable would mean in-app changes silently disagreeing with the
-          // reminder Google is holding.
-          await db.meetings.update(meetingId, {
-            source: 'google',
-            externalId,
-            accountId: account.id,
-            updatedAt: isoNow(),
+          // Creating the event and adopting it locally are one critical
+          // section: a sync landing between the two saw an untagged local
+          // record, judged the event new, and inserted a duplicate.
+          await withCalendarLock(async () => {
+            const { externalId } = await createGoogleEvent(account, {
+              title,
+              datetime,
+              location,
+              peopleText,
+            });
+            // Adopt it as the account's event. Without this the next sync would
+            // pull the same event back in as a second, duplicate meeting — and
+            // because the app never pushes edits, letting it stay locally
+            // editable would mean in-app changes silently disagreeing with the
+            // reminder Google is holding.
+            await db.meetings.update(meetingId, {
+              source: 'google',
+              externalId,
+              accountId: account.id,
+              updatedAt: isoNow(),
+            });
           });
           await after();
           showToast(`Added to ${account.email}`);
