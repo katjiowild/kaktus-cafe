@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { shortDate } from '../lib/dates';
 import { Card, EmptyState, PencilIcon, PinIcon } from '../components/ui';
 import type { ViewProps } from './types';
+import type { Note } from '../types';
 import { Linkify } from '../components/Linkify';
 
 export function Notes({ openSheet, wide }: ViewProps) {
@@ -15,10 +16,19 @@ export function Notes({ openSheet, wide }: ViewProps) {
   const [clipped, setClipped] = useState<Record<string, boolean>>({});
   const bodyRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const sorted = [...notes].sort((a, b) => {
-    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-    return b.date.localeCompare(a.date);
-  });
+  // A note with no project, no people and no meeting is one you'd struggle to
+  // find again — this filter is how you go and give it a home.
+  const isUntagged = (n: Note) =>
+    n.projectId === null && n.personIds.length === 0 && n.meetingId === null;
+  const [untaggedOnly, setUntaggedOnly] = useState(false);
+  const untaggedCount = notes.filter(isUntagged).length;
+
+  const sorted = [...notes]
+    .filter((n) => !untaggedOnly || isUntagged(n))
+    .sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return b.date.localeCompare(a.date);
+    });
 
   /**
    * "Read more" appears only when the text is genuinely truncated — measured on
@@ -53,6 +63,29 @@ export function Notes({ openSheet, wide }: ViewProps) {
 
   return (
     <div style={{ animation: 'sbfade .3s ease' }}>
+      {notes.length > 0 && (
+        <div style={{ display: 'flex', margin: '0 2px 12px' }}>
+          <button
+            onClick={() => setUntaggedOnly((v) => !v)}
+            aria-pressed={untaggedOnly}
+            style={{
+              border: `1px solid ${untaggedOnly ? C.deepSage : '#e6c9bd'}`,
+              background: untaggedOnly ? C.deepSage : C.card,
+              color: untaggedOnly ? C.paper : C.clay,
+              borderRadius: 20,
+              padding: '6px 12px',
+              fontSize: 12.5,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            No tags{untaggedCount > 0 ? ` (${untaggedCount})` : ''}
+          </button>
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
         {sorted.map((n) => {
           const project = projects.find((p) => p.id === n.projectId);
@@ -197,7 +230,9 @@ export function Notes({ openSheet, wide }: ViewProps) {
         })}
         {sorted.length === 0 && (
           <EmptyState>
-            No notes yet. Tap + to capture one.
+            {untaggedOnly
+              ? 'Every note is tagged to something. Nothing loose.'
+              : 'No notes yet. Tap + to capture one.'}
           </EmptyState>
         )}
       </div>
