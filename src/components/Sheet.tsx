@@ -948,6 +948,27 @@ function MeetingSheet({
           The event itself came from your calendar and syncs read-only — change the time, title or
           attendees there. Your notes stay here.
         </div>
+
+        <DeleteButton
+          onClick={() => {
+            void store.deleteMeeting(existing.id);
+            onClose();
+          }}
+        >
+          Remove from app
+        </DeleteButton>
+        <div
+          style={{
+            fontSize: 11.5,
+            color: C.muted,
+            lineHeight: 1.5,
+            textAlign: 'center',
+            marginTop: -2,
+          }}
+        >
+          Only removes it here — the event stays in your calendar, and any notes on it are kept.
+          {existing.accountId ? ' A future sync may pull it back in.' : ''}
+        </div>
       </div>
     );
   }
