@@ -362,7 +362,6 @@ export function App() {
       {isFocus && (
         <Focus
           timer={focusTimer}
-          wide={wide}
           onClose={() => {
             focusTimer.reset();
             go('today');

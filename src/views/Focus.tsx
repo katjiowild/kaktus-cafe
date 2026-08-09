@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { C, NARROW_MAX, SERIF, WIDE_MAX } from '../tokens';
+import { useEffect, useRef, useState } from 'react';
+import { C, SERIF } from '../tokens';
 import { DURATIONS, type FocusTimer } from '../lib/focus';
 
 const BG = `${import.meta.env.BASE_URL}focus/bg-focus.jpg`;
@@ -63,17 +63,37 @@ function SproutGlyph({ size = 16 }: { size?: number }) {
  * leaving the page doesn't stop the clock (see `useFocusTimer`). Only the
  * close button does.
  */
-export function Focus({
-  timer,
-  wide,
-  onClose,
-}: {
-  timer: FocusTimer;
-  wide: boolean;
-  onClose: () => void;
-}) {
+export function Focus({ timer, onClose }: { timer: FocusTimer; onClose: () => void }) {
   const { duration, remaining, fraction, running, intention, setDuration, toggle } = timer;
   const ring = useRef<SVGCircleElement>(null);
+  const dial = useRef<HTMLButtonElement>(null);
+
+  /**
+   * Everything inside the dial is sized from the dial itself rather than from
+   * fixed pixels, so unfolding the phone grows the clock instead of leaving a
+   * small one adrift in the middle of a big screen. Measured rather than
+   * computed in CSS because the dial's own size is a min() of width and
+   * height — there's no viewport unit that tracks it.
+   */
+  const [dialSize, setDialSize] = useState(260);
+  useEffect(() => {
+    const el = dial.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setDialSize(entry.contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // 260px is the design's dial, and these are its type sizes at that width.
+  const k = dialSize / 260;
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+  const digitsSize = clamp(52 * k, 40, 104);
+  const runLabelSize = clamp(13.5 * k, 12, 20);
+  const titleSize = clamp(20 * k, 20, 34);
+  const subtitleSize = clamp(12 * k, 12, 18);
+  const pillSize = clamp(13.5 * k, 13.5, 19);
 
   /**
    * The ring is written straight to the DOM on animation frames instead of
@@ -100,19 +120,11 @@ export function Focus({
   return (
     <div
       style={{
+        // The one page that ignores the app's 460px column: the photo fills
+        // whatever screen it's on, and the clock centres in it.
         position: 'fixed',
-        top: 0,
-        bottom: 0,
+        inset: 0,
         zIndex: 10,
-        // Unfolded, it sits over the same 460px column as the bottom nav, so
-        // ring and nav read as one panel rather than drifting apart.
-        ...(wide
-          ? {
-              width: NARROW_MAX,
-              right: `calc(max(0px, (100% - ${WIDE_MAX}px)/2))`,
-              left: 'auto',
-            }
-          : { left: 0, right: 0, maxWidth: NARROW_MAX, margin: '0 auto' }),
         overflow: 'hidden',
         // Everything on this page is white text sized for a dark photo. Until
         // the image arrives — cold load, slow connection, or it never loads —
@@ -188,24 +200,26 @@ export function Focus({
         >
           <div style={{ textAlign: 'center' }}>
             <div
-              style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 500, color: '#fff', ...LEGIBLE }}
+              style={{ fontFamily: SERIF, fontSize: titleSize, fontWeight: 500, color: '#fff', ...LEGIBLE }}
             >
               Focus time
             </div>
-            <div style={{ color: '#e9e4d8', fontSize: 12, marginTop: 2, ...LEGIBLE }}>
+            <div style={{ color: '#e9e4d8', fontSize: subtitleSize, marginTop: 2, ...LEGIBLE }}>
               Take a breath. You've got this.
             </div>
           </div>
 
           <button
+            ref={dial}
             onClick={toggle}
             aria-label={running ? 'Pause session' : 'Start session'}
             style={{
               position: 'relative',
-              width: 260,
-              height: 260,
-              maxWidth: '66vw',
-              maxHeight: '66vw',
+              // Bounded by both axes so it never crowds the pills below or the
+              // close button above, and never runs past a comfortable size on
+              // a large screen.
+              width: 'clamp(200px, min(64vw, 46vh), 420px)',
+              aspectRatio: '1',
               background: 'none',
               border: 'none',
               padding: 0,
@@ -255,7 +269,7 @@ export function Focus({
               <div
                 style={{
                   fontFamily: SERIF,
-                  fontSize: 52,
+                  fontSize: digitsSize,
                   fontWeight: 600,
                   color: '#fff',
                   letterSpacing: '-.01em',
@@ -269,12 +283,12 @@ export function Focus({
                   alignItems: 'center',
                   gap: 6,
                   color: '#e9e4d8',
-                  fontSize: 13.5,
+                  fontSize: runLabelSize,
                   fontWeight: 600,
                   marginTop: 5,
                 }}
               >
-                <CoffeeGlyph /> {running ? 'Pause' : 'Tap to start'}
+                <CoffeeGlyph size={runLabelSize} /> {running ? 'Pause' : 'Tap to start'}
               </div>
             </div>
           </button>
@@ -302,13 +316,13 @@ export function Focus({
                     aria-pressed={on}
                     style={{
                       flex: '0 0 auto',
-                      padding: '9px 18px',
+                      padding: `${Math.round(9 * (pillSize / 13.5))}px ${Math.round(18 * (pillSize / 13.5))}px`,
                       borderRadius: 20,
                       border: on ? 'none' : '1px solid rgba(255,255,255,.4)',
                       background: on ? C.deepSage : 'rgba(255,255,255,.1)',
                       color: '#fff',
                       fontFamily: 'inherit',
-                      fontSize: 13.5,
+                      fontSize: pillSize,
                       fontWeight: 600,
                       cursor: 'pointer',
                     }}

@@ -22,7 +22,7 @@ export type SheetState =
   | { type: 'person'; personId?: string }
   | {
       type: 'mini';
-      kind: 'milestone' | 'comment' | 'ptask' | 'subtask';
+      kind: 'milestone' | 'ptask' | 'subtask';
       ctx: string;
       title: string;
       label: string;
@@ -1149,6 +1149,7 @@ function PersonSheet({
 function MiniSheet({ state, onClose }: { state: SheetState & { type: 'mini' }; onClose: () => void }) {
   const store = useStore();
   const [value, setValue] = useState('');
+  const [date, setDate] = useState('');
 
   const save = async () => {
     const v = value.trim();
@@ -1158,10 +1159,7 @@ function MiniSheet({ state, onClose }: { state: SheetState & { type: 'mini' }; o
     }
     switch (state.kind) {
       case 'milestone':
-        await store.addMilestone(state.ctx, v);
-        break;
-      case 'comment':
-        await store.addComment(state.ctx, v);
+        await store.addMilestone(state.ctx, v, date || null);
         break;
       case 'ptask':
         await store.createTask({
@@ -1182,27 +1180,28 @@ function MiniSheet({ state, onClose }: { state: SheetState & { type: 'mini' }; o
     <>
       <Field top={12}>
         <label style={label}>{state.label}</label>
-        {state.kind === 'comment' ? (
-          <textarea
-            value={value}
-            autoFocus
-            onChange={(e) => setValue(e.target.value)}
-            placeholder={state.placeholder}
-            style={{ ...input, resize: 'none', minHeight: 80 }}
-          />
-        ) : (
+        <input
+          value={value}
+          autoFocus
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void save();
+          }}
+          placeholder={state.placeholder}
+          style={input}
+        />
+      </Field>
+      {state.kind === 'milestone' && (
+        <Field top={14}>
+          <label style={label}>Target date (optional)</label>
           <input
-            value={value}
-            autoFocus
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void save();
-            }}
-            placeholder={state.placeholder}
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
             style={input}
           />
-        )}
-      </Field>
+        </Field>
+      )}
       <button onClick={() => void save()} style={{ ...primaryBtn, marginTop: 18 }}>
         Save
       </button>

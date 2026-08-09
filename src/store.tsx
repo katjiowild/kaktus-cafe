@@ -84,11 +84,15 @@ export interface Store extends Data {
   toggleProjectPin: (id: string) => Promise<void>;
   reopenProject: (id: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
-  addMilestone: (projectId: string, text: string) => Promise<void>;
+  addMilestone: (projectId: string, text: string, date?: string | null) => Promise<void>;
+  setMilestoneDate: (
+    projectId: string,
+    milestoneId: string,
+    date: string | null,
+  ) => Promise<void>;
   toggleMilestone: (projectId: string, milestoneId: string) => Promise<void>;
   removeMilestone: (projectId: string, milestoneId: string) => Promise<void>;
   moveMilestone: (projectId: string, milestoneId: string, dir: -1 | 1) => Promise<void>;
-  addComment: (projectId: string, text: string) => Promise<void>;
   /** Project↔Person lives on Person.projectIds — one side, no duplicate field. */
   setProjectPeople: (projectId: string, personIds: string[]) => Promise<void>;
 
@@ -288,7 +292,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const now = isoNow();
         const milestones =
           type === 'active' && template !== 'blank' && template !== 'upkeep'
-            ? TEMPLATES[template].map((text) => ({ id: uid('ms'), text, done: false }))
+            ? TEMPLATES[template].map((text) => ({
+                id: uid('ms'),
+                text,
+                done: false,
+                date: null,
+              }))
             : [];
         const project: Project = {
           id,
@@ -303,7 +312,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           completedOn: null,
           pinned: false,
           milestones,
-          comments: [],
           createdAt: now,
           updatedAt: now,
         };
@@ -413,13 +421,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         showToast('Project deleted — its tasks and notes were kept');
       },
 
-      async addMilestone(projectId, text) {
+      async addMilestone(projectId, text, date = null) {
         const p = await db.projects.get(projectId);
         if (!p) return;
         await db.projects.update(projectId, {
-          milestones: [...p.milestones, { id: uid('ms'), text, done: false }],
+          milestones: [...p.milestones, { id: uid('ms'), text, done: false, date }],
         });
         await touchProject(projectId);
+        await after();
+      },
+
+      async setMilestoneDate(projectId, milestoneId, date) {
+        const p = await db.projects.get(projectId);
+        if (!p) return;
+        await db.projects.update(projectId, {
+          milestones: p.milestones.map((ms) => (ms.id === milestoneId ? { ...ms, date } : ms)),
+        });
         await after();
       },
 
@@ -457,17 +474,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         [list[i], list[j]] = [list[j], list[i]];
         await db.projects.update(projectId, { milestones: list });
         await after();
-      },
-
-      async addComment(projectId, text) {
-        const p = await db.projects.get(projectId);
-        if (!p) return;
-        await db.projects.update(projectId, {
-          comments: [{ id: uid('c'), at: isoNow(), text }, ...p.comments],
-        });
-        await touchProject(projectId);
-        await after();
-        showToast('Saved');
       },
 
       async setProjectPeople(projectId, personIds) {

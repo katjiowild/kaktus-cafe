@@ -64,6 +64,7 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, openPerson }: 
   const store = useStore();
   const { projects, tasks, notes, people, dismissed } = store;
   const [tab, setTab] = useState<Tab>('overview');
+  const [datingMilestone, setDatingMilestone] = useState<string | null>(null);
   const project = projects.find((p) => p.id === activeProjectId);
 
   if (!project) {
@@ -337,27 +338,67 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, openPerson }: 
                     >
                       <NavIcon name="flag" size={18} />
                     </span>
-                    {/* The brief has milestones display-only; the app has
-                        always let you tick them, so tapping still toggles. */}
-                    <button
-                      onClick={() => void store.toggleMilestone(project.id, ms.id)}
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        textAlign: 'left',
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                        fontSize: 13.5,
-                        fontWeight: 600,
-                        color: ms.done ? C.muted : C.ink,
-                        textDecoration: ms.done ? 'line-through' : 'none',
-                      }}
-                    >
-                      {ms.text}
-                    </button>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* The brief has milestones display-only; the app has
+                          always let you tick them, so tapping still toggles. */}
+                      <button
+                        onClick={() => void store.toggleMilestone(project.id, ms.id)}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          textAlign: 'left',
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          fontSize: 13.5,
+                          fontWeight: 600,
+                          color: ms.done ? C.muted : C.ink,
+                          textDecoration: ms.done ? 'line-through' : 'none',
+                        }}
+                      >
+                        {ms.text}
+                      </button>
+                      {datingMilestone === ms.id ? (
+                        <input
+                          type="date"
+                          autoFocus
+                          defaultValue={ms.date ?? ''}
+                          onChange={(e) => {
+                            void store.setMilestoneDate(project.id, ms.id, e.target.value || null);
+                          }}
+                          onBlur={() => setDatingMilestone(null)}
+                          style={{
+                            marginTop: 3,
+                            border: `1px solid ${C.line}`,
+                            background: C.card,
+                            borderRadius: 7,
+                            padding: '2px 6px',
+                            fontFamily: 'inherit',
+                            fontSize: 12,
+                            color: C.ink,
+                            outline: 'none',
+                          }}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => setDatingMilestone(ms.id)}
+                          style={{
+                            display: 'block',
+                            background: 'none',
+                            border: 'none',
+                            padding: '2px 0 0',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            fontSize: 12,
+                            color: ms.date ? C.muted : C.faint,
+                          }}
+                        >
+                          {ms.date ? shortDate(ms.date) : 'Set date'}
+                        </button>
+                      )}
+                    </div>
                     {ms.done && (
                       <span style={{ display: 'flex', flexShrink: 0, color: C.sage }}>
                         <svg
@@ -439,38 +480,6 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, openPerson }: 
               </div>
             </>
           )}
-
-          <TabHeading>Notes to self</TabHeading>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {project.comments.map((c) => (
-              <div
-                key={c.id}
-                style={{ background: '#efe9dc', borderRadius: 12, padding: '12px 13px' }}
-              >
-                <div style={{ fontSize: 13, color: C.ink, lineHeight: 1.5 }}>
-                  <Linkify text={c.text} />
-                </div>
-                <div style={{ fontSize: 10.5, color: C.muted, fontWeight: 600, marginTop: 6 }}>
-                  {shortDate(c.at)}
-                </div>
-              </div>
-            ))}
-            <button
-              onClick={() =>
-                openSheet({
-                  type: 'mini',
-                  kind: 'comment',
-                  ctx: project.id,
-                  title: 'Note to self',
-                  label: 'Note to self',
-                  placeholder: 'Jot a thought about this project',
-                })
-              }
-              style={dashedBtn}
-            >
-              ＋ Add a comment
-            </button>
-          </div>
 
           {/* CTA row — status changes only. Delete still lives in the edit
               sheet, where it already was. */}
