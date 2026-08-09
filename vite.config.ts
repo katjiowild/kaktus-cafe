@@ -49,8 +49,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
-        // Google Fonts must survive offline — the app is unusable-looking without Fraunces.
+        // jpg/mp3 carry the Focus page's background and its two audio loops —
+        // without them a session on a train would be silent and grey.
+        globPatterns: ['**/*.{js,css,html,png,jpg,svg,woff2,mp3}'],
+        // Google Fonts must survive offline — the app is unusable-looking without Zilla Slab.
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\//,

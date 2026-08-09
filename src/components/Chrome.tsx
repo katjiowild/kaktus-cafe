@@ -2,38 +2,41 @@ import { C, NARROW_MAX, WIDE_MAX } from '../tokens';
 import { NavIcon, PersonIcon } from './ui';
 import type { View } from '../views/types';
 
-/** The five bottom-nav items (confirmed with the owner: the design's bar). */
+/**
+ * The five bottom-nav items, in the Phase 2 design's order. More has given up
+ * its slot to Focus and now lives behind the header's hamburger.
+ *
+ * Projects sits where the design puts Garden — it becomes Garden in the next
+ * phase, so nothing moves again when that lands.
+ */
 const NAV: { view: View; label: string; icon: string }[] = [
   { view: 'today', label: 'Today', icon: 'today' },
-  { view: 'projects', label: 'Projects', icon: 'projects' },
-  { view: 'calendar', label: 'Calendar', icon: 'calendar' },
   { view: 'notes', label: 'Notes', icon: 'notes' },
-  { view: 'more', label: 'More', icon: 'more' },
+  { view: 'calendar', label: 'Calendar', icon: 'calendar' },
+  { view: 'focus', label: 'Focus', icon: 'focus' },
+  { view: 'projects', label: 'Projects', icon: 'projects' },
 ];
 
-/** Which nav item lights up for a given view — More owns everything nested under it. */
-const GROUP: Record<View, View> = {
+/** Which nav item lights up. Views the menu owns aren't listed — they keep the
+ *  tab you came from lit, so the bar never goes dark. */
+const GROUP: Partial<Record<View, View>> = {
   today: 'today',
+  notes: 'notes',
+  calendar: 'calendar',
+  focus: 'focus',
   projects: 'projects',
   projectDetail: 'projects',
-  calendar: 'calendar',
-  notes: 'notes',
-  more: 'more',
-  tasks: 'more',
-  meetings: 'more',
-  people: 'more',
-  personDetail: 'more',
-  archive: 'more',
-  settings: 'more',
-  system: 'more',
 };
 
 export function BottomNav({
   view,
+  fallback,
   wide,
   onGo,
 }: {
   view: View;
+  /** The tab to keep lit while a menu page is open. */
+  fallback: View;
   wide: boolean;
   onGo: (v: View) => void;
 }) {
@@ -54,7 +57,7 @@ export function BottomNav({
     ? { ...base, width: NARROW_MAX, right: `calc(max(0px, (100% - ${WIDE_MAX}px)/2))`, left: 'auto' }
     : { ...base, left: 0, right: 0, maxWidth: NARROW_MAX, margin: '0 auto' };
 
-  const active = GROUP[view];
+  const active = GROUP[view] ?? fallback;
 
   return (
     <nav style={style}>
@@ -112,9 +115,11 @@ export function RadialMenu({
   onToggle: () => void;
   onPick: (kind: AddKind) => void;
 }) {
+  // Below 460px the canvas is narrower than NARROW_MAX, so the old offset went
+  // negative and pushed the button half off the right edge — on every phone.
   const fabRight = wide
     ? `calc(max(0px, (100% - ${WIDE_MAX}px)/2) + 22px)`
-    : `calc(50% - ${NARROW_MAX / 2}px + 22px)`;
+    : `calc(max(0px, 50% - ${NARROW_MAX / 2}px) + 22px)`;
   const radius = 82;
   const angles = [198, 172, 146, 120, 94];
 

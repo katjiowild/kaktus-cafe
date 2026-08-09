@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { C, NARROW_MAX, SERIF, WIDE_BREAKPOINT, WIDE_MAX } from './tokens';
+import { C, NARROW_MAX, SERIF, TYPE, WIDE_BREAKPOINT, WIDE_MAX } from './tokens';
 import { useStore } from './store';
 import { BottomNav, RadialMenu, Scrim, type AddKind } from './components/Chrome';
 import { Sheet, type SheetState } from './components/Sheet';
-import { SearchIcon, Toast } from './components/ui';
+import { HamburgerIcon, SearchIcon, Toast } from './components/ui';
 import { Search } from './components/Search';
 import { Today } from './views/Today';
 import { Projects } from './views/Projects';
@@ -11,9 +11,11 @@ import { ProjectDetail } from './views/ProjectDetail';
 import { Tasks } from './views/Tasks';
 import { Notes } from './views/Notes';
 import { Calendar } from './views/Calendar';
+import { Focus } from './views/Focus';
 import { People, PersonDetail } from './views/People';
 import { Archive, Meetings, More, VisualSystem } from './views/Misc';
 import { Settings } from './views/Settings';
+import { useFocusTimer } from './lib/focus';
 import type { View, ViewProps } from './views/types';
 
 /** Two-pane master–detail when unfolded (owner-confirmed: Projects, People, Calendar). */
@@ -24,12 +26,24 @@ const TWO_PANE: Partial<Record<View, true>> = {
   personDetail: true,
 };
 
+/** The tabs the bottom bar can land on — used to remember where the hamburger
+ *  was opened from, so Back and the lit tab both point home. */
+const MAIN_VIEWS: Partial<Record<View, true>> = {
+  today: true,
+  notes: true,
+  calendar: true,
+  focus: true,
+  projects: true,
+};
+
+/** Short names — the header shows these, and the back chevron reuses them. */
 const TITLES: Record<View, string> = {
   today: 'Today',
   projects: 'Projects',
   projectDetail: 'Project',
   calendar: 'Calendar',
   notes: 'Notes',
+  focus: 'Focus',
   more: 'More',
   tasks: 'Tasks',
   meetings: 'Meetings',
@@ -57,12 +71,16 @@ export function App() {
   // Selection lives independently of the width flag, so folding and unfolding
   // mid-use never resets which project or person is open (§1.1).
   const [view, setView] = useState<View>('today');
+  const [prevMainView, setPrevMainView] = useState<View>('today');
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activePersonId, setActivePersonId] = useState<string | null>(null);
   const [radialOpen, setRadialOpen] = useState(false);
   const [sheet, setSheet] = useState<SheetState | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const wide = useWide();
+  // Lifted out of the Focus view so a session keeps running while you go and
+  // look something up (v-phase2 §1).
+  const focusTimer = useFocusTimer(() => store.showToast('Session complete 🌱'));
 
   /**
    * Home-screen shortcuts land here as `?new=task` / `?new=meeting` (v6 §1) —
@@ -80,6 +98,7 @@ export function App() {
 
   const go = (v: View) => {
     setView(v);
+    if (MAIN_VIEWS[v]) setPrevMainView(v);
     setActiveProjectId(null);
     setActivePersonId(null);
     setRadialOpen(false);
@@ -111,15 +130,46 @@ export function App() {
   };
 
   const props: ViewProps = useMemo(
-    () => ({ wide, go, openProject, openPerson, openSheet, activeProjectId, activePersonId }),
+    () => ({
+      wide,
+      go,
+      openProject,
+      openPerson,
+      openSheet,
+      activeProjectId,
+      activePersonId,
+      focusIntention: focusTimer.intention,
+      setFocusIntention: focusTimer.setIntention,
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [wide, activeProjectId, activePersonId],
+    [wide, activeProjectId, activePersonId, focusTimer.intention, focusTimer.setIntention],
   );
 
   const isProjectPane = view === 'projects' || view === 'projectDetail';
   const isPeoplePane = view === 'people' || view === 'personDetail';
   const twoPane = wide && Boolean(TWO_PANE[view]);
-  const showBack = !wide && (view === 'projectDetail' || view === 'personDetail');
+  // Focus is the one full-bleed page — it replaces the cream chrome entirely,
+  // keeping only the bottom nav.
+  const isFocus = view === 'focus';
+
+  /**
+   * Nothing under the hamburger has a tab of its own any more, so each of those
+   * pages carries its own way back: out to the menu, and from the menu out to
+   * whichever tab you opened it from.
+   */
+  const back: View | null =
+    view === 'more'
+      ? prevMainView
+      : view === 'personDetail'
+        ? 'people'
+        : view === 'projectDetail'
+          ? 'projects'
+          : MAIN_VIEWS[view]
+            ? null
+            : 'more';
+  // Unfolded, the detail pane sits beside its list — there's nothing to go back to.
+  const showBack =
+    back !== null && !(wide && (view === 'projectDetail' || view === 'personDetail'));
 
   const activeProject = store.projects.find((p) => p.id === activeProjectId);
   const activePerson = store.people.find((p) => p.id === activePersonId);
@@ -128,7 +178,11 @@ export function App() {
       ? (activeProject?.name ?? 'Project')
       : view === 'personDetail'
         ? (activePerson?.name ?? 'Person')
-        : TITLES[view];
+        : // Today carries the greeting above it, so the headline can be the
+          // design's question rather than repeating the word.
+          view === 'today'
+          ? "What's brewing today?"
+          : TITLES[view];
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
@@ -165,114 +219,157 @@ export function App() {
         boxShadow: '0 0 60px rgba(36,43,40,.12)',
       }}
     >
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 20,
-          padding: '18px 20px 10px',
-          background: 'linear-gradient(#f4f1e9 76%, rgba(244,241,233,0))',
-        }}
-      >
-        {showBack && (
-          <button
-            onClick={() => go(view === 'projectDetail' ? 'projects' : 'people')}
+      {!isFocus && (
+        <>
+          <header
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'none',
-              border: 'none',
-              color: C.softInk,
-              fontFamily: 'inherit',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              padding: '0 0 6px',
+              position: 'sticky',
+              top: 0,
+              zIndex: 20,
+              padding: '18px 20px 10px',
+              background: 'linear-gradient(#f4f1e9 76%, rgba(244,241,233,0))',
             }}
           >
-            ‹ {view === 'projectDetail' ? 'Projects' : 'People'}
-          </button>
-        )}
-        {view === 'today' && (
-          <div
-            style={{
-              fontSize: 12,
-              letterSpacing: '.14em',
-              textTransform: 'uppercase',
-              color: C.muted,
-              fontWeight: 600,
-            }}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 4,
+              }}
+            >
+              {/* A page with its own way back doesn't also offer the menu —
+                  one backwards affordance per screen. */}
+              {showBack ? (
+                <span />
+              ) : (
+                <button
+                  onClick={() => go('more')}
+                  title="Menu"
+                  aria-label="Menu"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 6,
+                    margin: '0 0 0 -6px',
+                    color: C.ink,
+                    display: 'flex',
+                  }}
+                >
+                  <HamburgerIcon />
+                </button>
+              )}
+              <button
+                onClick={() => setSearchOpen(true)}
+                title="Search"
+                aria-label="Search"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 6,
+                  margin: '0 -6px 0 0',
+                  color: C.softInk,
+                  display: 'flex',
+                }}
+              >
+                <SearchIcon />
+              </button>
+            </div>
+            {showBack && back && (
+              <button
+                onClick={() => go(back)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: 'none',
+                  border: 'none',
+                  color: C.softInk,
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '0 0 6px',
+                }}
+              >
+                ‹ {TITLES[back]}
+              </button>
+            )}
+            {view === 'today' && (
+              <div
+                style={{
+                  fontSize: 12,
+                  letterSpacing: '.05em',
+                  color: C.clay,
+                  fontWeight: 700,
+                }}
+              >
+                {greeting}
+              </div>
+            )}
+            <div
+              style={{
+                fontFamily: SERIF,
+                fontSize: view === 'today' ? TYPE.headline : TYPE.pageTitle,
+                fontWeight: 500,
+                letterSpacing: '-.01em',
+                marginTop: 3,
+                lineHeight: 1.05,
+              }}
+            >
+              {headerTitle}
+            </div>
+          </header>
+
+          <main
+            style={
+              twoPane
+                ? { padding: '2px 20px 120px', display: 'flex', gap: 20, alignItems: 'flex-start' }
+                : { padding: '2px 16px 128px' }
+            }
           >
-            {greeting}
-          </div>
-        )}
-        <div
-          style={{
-            fontFamily: SERIF,
-            fontSize: 29,
-            fontWeight: 500,
-            letterSpacing: '-.01em',
-            marginTop: 2,
-            lineHeight: 1.05,
+            {view === 'today' && <Today {...props} />}
+            {view === 'tasks' && <Tasks {...props} />}
+            {view === 'notes' && <Notes {...props} />}
+            {view === 'calendar' && <Calendar {...props} />}
+            {view === 'meetings' && <Meetings {...props} />}
+            {view === 'more' && <More {...props} />}
+            {view === 'archive' && <Archive {...props} />}
+            {view === 'settings' && <Settings />}
+            {view === 'system' && <VisualSystem />}
+
+            {/* Two-pane: the list stays put and the detail fills the right pane. */}
+            {isProjectPane && (wide || view === 'projects') && <Projects {...props} />}
+            {isProjectPane && (wide || view === 'projectDetail') && <ProjectDetail {...props} />}
+            {isPeoplePane && (wide || view === 'people') && <People {...props} />}
+            {isPeoplePane && (wide || view === 'personDetail') && <PersonDetail {...props} />}
+          </main>
+
+          {radialOpen && <Scrim onClick={() => setRadialOpen(false)} />}
+
+          <RadialMenu
+            open={radialOpen}
+            wide={wide}
+            onToggle={() => setRadialOpen((o) => !o)}
+            onPick={onAdd}
+          />
+        </>
+      )}
+
+      {isFocus && (
+        <Focus
+          timer={focusTimer}
+          wide={wide}
+          onClose={() => {
+            focusTimer.reset();
+            go('today');
           }}
-        >
-          {headerTitle}
-        </div>
-        <button
-          onClick={() => setSearchOpen(true)}
-          title="Search"
-          aria-label="Search"
-          style={{
-            position: 'absolute',
-            top: 16,
-            right: 18,
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 7,
-            color: C.softInk,
-            display: 'flex',
-          }}
-        >
-          <SearchIcon />
-        </button>
-      </header>
+        />
+      )}
 
-      <main
-        style={
-          twoPane
-            ? { padding: '2px 20px 120px', display: 'flex', gap: 20, alignItems: 'flex-start' }
-            : { padding: '2px 16px 128px' }
-        }
-      >
-        {view === 'today' && <Today {...props} />}
-        {view === 'tasks' && <Tasks {...props} />}
-        {view === 'notes' && <Notes {...props} />}
-        {view === 'calendar' && <Calendar {...props} />}
-        {view === 'meetings' && <Meetings {...props} />}
-        {view === 'more' && <More {...props} />}
-        {view === 'archive' && <Archive {...props} />}
-        {view === 'settings' && <Settings />}
-        {view === 'system' && <VisualSystem />}
-
-        {/* Two-pane: the list stays put and the detail fills the right pane. */}
-        {isProjectPane && (wide || view === 'projects') && <Projects {...props} />}
-        {isProjectPane && (wide || view === 'projectDetail') && <ProjectDetail {...props} />}
-        {isPeoplePane && (wide || view === 'people') && <People {...props} />}
-        {isPeoplePane && (wide || view === 'personDetail') && <PersonDetail {...props} />}
-      </main>
-
-      {radialOpen && <Scrim onClick={() => setRadialOpen(false)} />}
-
-      <RadialMenu
-        open={radialOpen}
-        wide={wide}
-        onToggle={() => setRadialOpen((o) => !o)}
-        onPick={onAdd}
-      />
-
-      <BottomNav view={view} wide={wide} onGo={go} />
+      <BottomNav view={view} fallback={prevMainView} wide={wide} onGo={go} />
 
       {sheet && (
         <Sheet

@@ -4,6 +4,7 @@ export type View =
   | 'projectDetail'
   | 'calendar'
   | 'notes'
+  | 'focus'
   | 'more'
   | 'tasks'
   | 'meetings'
@@ -24,4 +25,7 @@ export interface ViewProps {
   openSheet: (s: SheetState) => void;
   activeProjectId: string | null;
   activePersonId: string | null;
+  /** Today's intention — written on Today's focus card, read on the Focus page. */
+  focusIntention: string;
+  setFocusIntention: (text: string) => void;
 }

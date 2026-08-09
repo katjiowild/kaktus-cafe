@@ -1,9 +1,9 @@
-import { ACCENT, C, SERIF } from '../tokens';
+import { ACCENT, C, sectionHeader, SERIF } from '../tokens';
 import { useAccountEmail, useStore } from '../store';
 import { shortDate, timeLabel } from '../lib/dates';
 import { projectMeta, VITALITY_LABEL, type Vitality } from '../lib/derive';
 import { Plant } from '../components/Plant';
-import { Card, EmptyState, PersonIcon, SourceBadge, TypeBadge } from '../components/ui';
+import { Card, EmptyState, LocationIcon, NavIcon, SourceBadge, TypeBadge } from '../components/ui';
 import type { View, ViewProps } from './types';
 import { Linkify } from '../components/Linkify';
 
@@ -84,7 +84,7 @@ export function Meetings({ openSheet }: ViewProps) {
                     gap: 4,
                   }}
                 >
-                  📍 <Linkify text={m.location} />
+                  <LocationIcon /> <Linkify text={m.location} />
                 </div>
               )}
               {notesFor(m.id).length > 0 && (
@@ -210,13 +210,18 @@ export function Archive({ openProject }: ViewProps) {
 
 // ---------------- More ----------------
 
-const MORE: { view: View; label: string; sub: string; glyph: React.ReactNode }[] = [
-  { view: 'tasks', label: 'Tasks', sub: 'Every open & completed task', glyph: '✓' },
-  { view: 'meetings', label: 'Meetings', sub: 'Everything on the books', glyph: '🗓️' },
-  { view: 'people', label: 'People', sub: 'Your light CRM', glyph: <PersonIcon /> },
-  { view: 'system', label: 'Visual system', sub: 'Plants, types & the radial menu', glyph: '❋' },
-  { view: 'archive', label: 'Archive', sub: 'Completed projects', glyph: '🗄️' },
-  { view: 'settings', label: 'Backup & settings', sub: 'Backup, connections, data', glyph: '⚙️' },
+const MORE: { view: View; label: string; sub: string; icon: string }[] = [
+  { view: 'tasks', label: 'Tasks', sub: 'Every open & completed task', icon: 'tasks' },
+  { view: 'meetings', label: 'Meetings', sub: 'Everything on the books', icon: 'meetings' },
+  { view: 'people', label: 'People', sub: 'Your light CRM', icon: 'people' },
+  { view: 'system', label: 'Visual system', sub: 'Plants, types & the radial menu', icon: 'system' },
+  { view: 'archive', label: 'Archive', sub: 'Completed projects', icon: 'archive' },
+  {
+    view: 'settings',
+    label: 'Backup & settings',
+    sub: 'Backup, connections, data',
+    icon: 'settings',
+  },
 ];
 
 export function More({ go }: ViewProps) {
@@ -238,9 +243,9 @@ export function More({ go }: ViewProps) {
             textAlign: 'left',
             background: C.card,
             border: `1px solid ${C.cardBorder}`,
-            borderRadius: 13,
+            borderRadius: 14,
             boxShadow: '0 1px 2px rgba(36,43,40,.05)',
-            padding: '15px 16px',
+            padding: '14px 15px',
             display: 'flex',
             alignItems: 'center',
             gap: 13,
@@ -250,25 +255,24 @@ export function More({ go }: ViewProps) {
         >
           <span
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
+              width: 40,
+              height: 40,
+              borderRadius: 11,
               background: C.paper2,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 16,
               flexShrink: 0,
               color: C.sage,
             }}
           >
-            {i.glyph}
+            <NavIcon name={i.icon} size={20} />
           </span>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{i.label}</div>
+            <div style={{ fontSize: 14.5, fontWeight: 600, color: C.ink }}>{i.label}</div>
             <div style={{ fontSize: 12, color: C.muted, marginTop: 1 }}>{i.sub}</div>
           </div>
-          <span style={{ color: '#c3bba9', fontSize: 18 }}>›</span>
+          <span style={{ color: C.faint, fontSize: 18 }}>›</span>
         </button>
       ))}
     </div>
@@ -296,12 +300,7 @@ export function VisualSystem() {
     fontWeight: 600,
     marginTop: 2,
   };
-  const h: React.CSSProperties = {
-    fontFamily: SERIF,
-    fontWeight: 500,
-    fontSize: 18,
-    margin: '20px 2px 10px',
-  };
+  const h: React.CSSProperties = { ...sectionHeader, margin: '20px 2px 10px' };
 
   return (
     <div style={{ animation: 'sbfade .3s ease' }}>

@@ -3,7 +3,7 @@ import { C, dashedBtn, input, label, pill, primaryBtn, SERIF } from '../tokens';
 import { useStore, type TemplateKey } from '../store';
 import { isoDate, WEEKDAY_LETTERS } from '../lib/dates';
 import type { Cadence, ProjectType, Recurrence } from '../types';
-import { Checkbox, ToggleRow } from './ui';
+import { Checkbox, FlameIcon, LocationIcon, PinIcon, ToggleRow } from './ui';
 import { PersonPicker } from './PersonPicker';
 import { Linkify } from './Linkify';
 import { canWrite } from '../lib/googleAuth';
@@ -320,7 +320,7 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
 
       <Field top={16}>
         <ToggleRow
-          icon="🔥"
+          icon={<FlameIcon />}
           label="Mark as urgent"
           on={urgent}
           onToggle={() => setUrgent((u) => !u)}
@@ -539,7 +539,9 @@ function NoteSheet({ state, onClose }: { state: SheetState & { type: 'note' }; o
             padding: '12px 14px',
           }}
         >
-          <span style={{ fontSize: 15 }}>📌</span>
+          <span style={{ display: 'flex' }}>
+            <PinIcon pinned={existing.pinned} size={15} />
+          </span>
           <span style={{ fontSize: 14, fontWeight: 600, flex: 1, color: C.ink }}>Pin to top</span>
           <span
             style={{
@@ -928,7 +930,11 @@ function MeetingSheet({
             minute: '2-digit',
             hour12: false,
           })}
-          {existing.location && <div>📍 {existing.location}</div>}
+          {existing.location && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <LocationIcon /> {existing.location}
+            </div>
+          )}
           {existing.peopleText && <div>With {existing.peopleText}</div>}
         </div>
         {/* The event is read-only, but the notes are ours — most meetings will
