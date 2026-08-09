@@ -39,6 +39,8 @@ export interface Project {
   lastActivityDate: string;
   /** ISO date, set when status becomes 'done'. */
   completedOn: string | null;
+  /** Featured on the Garden page. At most GARDEN_SLOTS projects at a time. */
+  pinned: boolean;
   milestones: Milestone[];
   comments: ProjectComment[];
   createdAt: string;

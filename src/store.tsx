@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { db, getSetting, setSetting, uid } from './db';
+import { db, GARDEN_SLOTS, getSetting, setSetting, uid } from './db';
 import { isoDate, isoNow, nextOccurrence, parseDate, today } from './lib/dates';
 import {
   createGoogleEvent,
@@ -76,6 +76,12 @@ export interface Store extends Data {
   }) => Promise<string>;
   updateProject: (id: string, patch: Partial<Project>) => Promise<void>;
   completeProject: (id: string) => Promise<void>;
+  /** Park a project without finishing it. Separate from `reopenProject`, which
+   *  is the Archive's restore and says so in its toast. */
+  holdProject: (id: string) => Promise<void>;
+  resumeProject: (id: string) => Promise<void>;
+  /** Feature this project in the Garden, or take it out. Capped at GARDEN_SLOTS. */
+  toggleProjectPin: (id: string) => Promise<void>;
   reopenProject: (id: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   addMilestone: (projectId: string, text: string) => Promise<void>;
@@ -295,6 +301,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           cadence: type === 'retainer' ? (cadence ?? 'weekly') : null,
           lastActivityDate: now,
           completedOn: null,
+          pinned: false,
           milestones,
           comments: [],
           createdAt: now,
@@ -339,7 +346,42 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           updatedAt: isoNow(),
         });
         await after();
-        showToast('Completed — moved to Archive');
+        showToast('Project marked completed 🎉');
+      },
+
+      async holdProject(id) {
+        await db.projects.update(id, { status: 'onhold', updatedAt: isoNow() });
+        await after();
+        showToast('Project put on hold');
+      },
+
+      async resumeProject(id) {
+        await db.projects.update(id, {
+          status: 'active',
+          // A parked project shouldn't come back already wilted for the time it
+          // spent parked — resuming counts as touching it.
+          lastActivityDate: isoNow(),
+          updatedAt: isoNow(),
+        });
+        await after();
+        showToast('Project resumed');
+      },
+
+      async toggleProjectPin(id) {
+        const project = await db.projects.get(id);
+        if (!project) return;
+        if (!project.pinned) {
+          // Counted from the database, not from `data`, so two quick taps can't
+          // both read a stale seven-minus-one and overfill the Garden.
+          const pinnedCount = await db.projects.filter((p) => p.pinned).count();
+          if (pinnedCount >= GARDEN_SLOTS) {
+            showToast('Garden is full — remove a plant first');
+            return;
+          }
+        }
+        await db.projects.update(id, { pinned: !project.pinned, updatedAt: isoNow() });
+        await after();
+        showToast(project.pinned ? 'Removed from the Garden' : 'Pinned to the Garden');
       },
 
       async reopenProject(id) {

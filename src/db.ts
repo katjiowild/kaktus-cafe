@@ -149,8 +149,24 @@ class KaktusDB extends Dexie {
             if (t.dueTime === undefined) t.dueTime = null;
           });
       });
+
+    // v8 — Project.pinned (Phase 2). Backfilled to false so nothing arrives in
+    // the Garden unasked, and no consumer reads `undefined` for a boolean.
+    this.version(8)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx
+          .table<Project>('projects')
+          .toCollection()
+          .modify((p) => {
+            if (typeof p.pinned !== 'boolean') p.pinned = false;
+          });
+      });
   }
 }
+
+/** How many projects the Garden can show at once. */
+export const GARDEN_SLOTS = 7;
 
 export const db = new KaktusDB();
 
