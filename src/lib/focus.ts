@@ -20,8 +20,15 @@ interface SessionCount {
 export interface FocusTimer {
   /** Chosen session length, in minutes. */
   duration: number;
-  /** Seconds left in the current session. */
+  /** Seconds left in the current session, for the digits. */
   remaining: number;
+  /**
+   * Continuous 1→0 progress, read live off the deadline. The ring animates
+   * from this rather than from `remaining`: a whole second is under half a
+   * pixel of the circumference on a long session, so a per-second ring looks
+   * frozen for the first minute and then lags a step behind for the rest.
+   */
+  fraction: () => number;
   running: boolean;
   /** Sessions finished today — resets itself when the date rolls over. */
   sessionsToday: number;
@@ -92,7 +99,9 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
     if (!running) return;
     const id = window.setInterval(() => {
       if (deadline.current === null) return;
-      const left = Math.max(0, Math.round((deadline.current - Date.now()) / 1000));
+      // Ceil, not round: a countdown should read 25:00 for the whole first
+      // second and reach 00:00 exactly as the deadline passes.
+      const left = Math.max(0, Math.ceil((deadline.current - Date.now()) / 1000));
       setRemaining(left);
       if (left === 0) {
         void finish();
@@ -105,6 +114,21 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
 
   // Whatever else happens, the loop shouldn't outlive the app.
   useEffect(() => stopAudio, [stopAudio]);
+
+  // Read through a ref so the callback identity is stable and an animation
+  // frame loop can hold onto it without restarting every second.
+  const live = useRef({ duration, remaining });
+  live.current = { duration, remaining };
+
+  const fraction = useCallback(() => {
+    const total = live.current.duration * 60 * 1000;
+    if (total <= 0) return 0;
+    const leftMs =
+      deadline.current === null
+        ? live.current.remaining * 1000
+        : Math.max(0, deadline.current - Date.now());
+    return Math.min(1, leftMs / total);
+  }, []);
 
   const toggle = useCallback(() => {
     if (running) {
@@ -145,5 +169,5 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
     setRemaining(duration * 60);
   }, [duration, stopAudio]);
 
-  return { duration, remaining, running, sessionsToday, setDuration, toggle, reset };
+  return { duration, remaining, fraction, running, sessionsToday, setDuration, toggle, reset };
 }

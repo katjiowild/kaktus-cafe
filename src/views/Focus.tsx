@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { C, NARROW_MAX, SERIF, WIDE_MAX } from '../tokens';
 import { DURATIONS, type FocusTimer } from '../lib/focus';
 
@@ -71,9 +72,30 @@ export function Focus({
   wide: boolean;
   onClose: () => void;
 }) {
-  const { duration, remaining, running, sessionsToday, setDuration, toggle } = timer;
-  const fraction = remaining / (duration * 60);
-  const dashOffset = (1 - fraction) * CIRCUMFERENCE;
+  const { duration, remaining, fraction, running, sessionsToday, setDuration, toggle } = timer;
+  const ring = useRef<SVGCircleElement>(null);
+
+  /**
+   * The ring is written straight to the DOM on animation frames instead of
+   * being re-rendered from state. State only carries whole seconds — far too
+   * coarse for a 704px circumference — and re-rendering the page 60 times a
+   * second to smooth it out would be worse than the problem.
+   */
+  useEffect(() => {
+    const draw = () => {
+      if (ring.current) {
+        ring.current.style.strokeDashoffset = String((1 - fraction()) * CIRCUMFERENCE);
+      }
+    };
+    draw();
+    if (!running) return;
+    let frame = requestAnimationFrame(function loop() {
+      draw();
+      frame = requestAnimationFrame(loop);
+    });
+    return () => cancelAnimationFrame(frame);
+    // Paused, the ring only needs redrawing when the clock itself changes.
+  }, [fraction, running, duration, remaining]);
 
   return (
     <div
@@ -195,6 +217,7 @@ export function Focus({
                 strokeWidth={11}
               />
               <circle
+                ref={ring}
                 cx={125}
                 cy={125}
                 r={RADIUS}
@@ -203,9 +226,9 @@ export function Focus({
                 strokeWidth={11}
                 strokeLinecap="round"
                 strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
-                strokeDashoffset={dashOffset}
-                // Matches the tick interval: the sweep glides instead of stepping.
-                style={{ transition: 'stroke-dashoffset .25s linear' }}
+                // First paint only — the frame loop above owns it after that.
+                // No CSS transition: it would put the ring a step behind.
+                strokeDashoffset={(1 - remaining / (duration * 60)) * CIRCUMFERENCE}
               />
               <defs>
                 <linearGradient id="focusGrad" x1="0" y1="0" x2="1" y2="1">
