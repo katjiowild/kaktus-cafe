@@ -2,14 +2,13 @@ import { C, SERIF, sectionHeader } from '../tokens';
 import { useAccountEmail, useStore } from '../store';
 import { isoDate, timeLabel } from '../lib/dates';
 import { projectMeta, sortOpenTasks } from '../lib/derive';
-import { Garden } from '../components/Garden';
 import { Plant } from '../components/Plant';
-import { TaskRow } from '../components/TaskRow';
-import { Card, EmptyState, LocationIcon, SourceBadge } from '../components/ui';
+import { TaskLine } from '../components/TaskRow';
+import { Card, EmptyState, LocationIcon, NavIcon, SourceBadge } from '../components/ui';
 import type { ViewProps } from './types';
 import { Linkify } from '../components/Linkify';
 
-export function Today({ openProject, openSheet }: ViewProps) {
+export function Today({ openProject, openSheet, go, focusSessions }: ViewProps) {
   const store = useStore();
   const accountEmail = useAccountEmail();
   const { projects, tasks, meetings, notes, dismissed } = store;
@@ -32,8 +31,79 @@ export function Today({ openProject, openSheet }: ViewProps) {
 
   return (
     <div style={{ animation: 'sbfade .3s ease' }}>
-      {/* The garden opens Today — the first thing seen (v5 §1). */}
-      <Garden onOpenProject={openProject} />
+      {/* Today's focus — the design's sage card, opening the Focus timer
+          rather than logging a line of text (owner's call). */}
+      <button
+        onClick={() => go('focus')}
+        style={{
+          width: '100%',
+          textAlign: 'left',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 13,
+          background: C.sageBg,
+          border: `1px solid ${C.sageBorder}`,
+          borderRadius: 16,
+          padding: '15px 16px',
+          margin: '6px 0 20px',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+        }}
+      >
+        <span
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 11,
+            background: C.card,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: C.sage,
+            flexShrink: 0,
+          }}
+        >
+          <NavIcon name="focus" size={22} />
+        </span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span
+            style={{ display: 'block', fontWeight: 600, fontSize: 15, color: C.deepSage }}
+          >
+            Today's focus
+          </span>
+          <span style={{ display: 'block', fontSize: 12.5, color: C.softInk, marginTop: 1 }}>
+            {focusSessions === 0
+              ? 'Start a session when you’re ready'
+              : `${focusSessions} session${focusSessions === 1 ? '' : 's'} done today`}
+          </span>
+        </span>
+        <span
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: '50%',
+            background: C.sage,
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <svg
+            width={16}
+            height={16}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M9 5l7 7-7 7" />
+          </svg>
+        </span>
+      </button>
 
       {nudges.map(({ project, meta }) => (
         <div
@@ -180,26 +250,27 @@ export function Today({ openProject, openSheet }: ViewProps) {
           {todayTasks.length} to do
         </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-        {todayTasks.map((t) => (
-          <TaskRow
-            key={t.id}
-            task={t}
-            onOpen={() => openSheet({ type: 'task', taskId: t.id })}
-            onAddSubtask={() =>
-              openSheet({
-                type: 'mini',
-                kind: 'subtask',
-                ctx: t.id,
-                title: 'Add subtask',
-                label: 'Subtask',
-                placeholder: 'Break it into a small step',
-              })
-            }
-          />
-        ))}
-        {todayTasks.length === 0 && <EmptyState>Nothing left for today. Enjoy the space.</EmptyState>}
-      </div>
+      {todayTasks.length > 0 ? (
+        <div
+          style={{
+            background: C.card,
+            border: `1px solid ${C.cardBorder}`,
+            borderRadius: 14,
+            overflow: 'hidden',
+          }}
+        >
+          {todayTasks.map((t, i) => (
+            <TaskLine
+              key={t.id}
+              task={t}
+              last={i === todayTasks.length - 1}
+              onOpen={() => openSheet({ type: 'task', taskId: t.id })}
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptyState>Nothing left for today. Enjoy the space.</EmptyState>
+      )}
     </div>
   );
 }

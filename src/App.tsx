@@ -130,9 +130,18 @@ export function App() {
   };
 
   const props: ViewProps = useMemo(
-    () => ({ wide, go, openProject, openPerson, openSheet, activeProjectId, activePersonId }),
+    () => ({
+      wide,
+      go,
+      openProject,
+      openPerson,
+      openSheet,
+      activeProjectId,
+      activePersonId,
+      focusSessions: focusTimer.sessionsToday,
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [wide, activeProjectId, activePersonId],
+    [wide, activeProjectId, activePersonId, focusTimer.sessionsToday],
   );
 
   const isProjectPane = view === 'projects' || view === 'projectDetail';

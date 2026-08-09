@@ -4,6 +4,77 @@ import { useStore } from '../store';
 import type { Task } from '../types';
 import { Checkbox, OverdueFlag, ProjectChip, UrgentFlag } from './ui';
 
+/**
+ * The tight one-line row Today uses: rows share a single card and are divided
+ * by a hairline rather than floating as separate cards, and the due date sits
+ * right-aligned instead of in a meta row beneath the title.
+ *
+ * Deliberately carries less than {@link TaskRow} — no project chip, recurrence
+ * mark or subtask affordance. Overdue reads as red on the date, as in the
+ * design; urgency keeps its badge because it reorders the list and would
+ * otherwise be invisible. Everything else is a tap away in the task itself.
+ */
+export function TaskLine({
+  task,
+  last,
+  onOpen,
+}: {
+  task: Task;
+  last: boolean;
+  onOpen: () => void;
+}) {
+  const store = useStore();
+  const overdue = isOverdue(task.dueDate, task.done);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '13px 15px',
+        borderBottom: last ? 'none' : `1px solid ${C.paper2}`,
+        opacity: task.done ? 0.55 : 1,
+      }}
+    >
+      <Checkbox
+        done={task.done}
+        size={20}
+        radius={10}
+        onClick={() => void store.toggleTask(task.id)}
+      />
+      <div
+        onClick={onOpen}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          fontSize: 14.5,
+          fontWeight: 600,
+          lineHeight: 1.3,
+          wordBreak: 'break-word',
+          cursor: 'pointer',
+          textDecoration: task.done ? 'line-through' : 'none',
+          color: task.done ? C.muted : C.ink,
+        }}
+      >
+        {task.title}
+      </div>
+      {task.urgent && !task.done && <UrgentFlag />}
+      <span
+        style={{
+          flexShrink: 0,
+          fontSize: 12,
+          fontWeight: 600,
+          color: overdue ? C.overdue : C.muted,
+        }}
+      >
+        {dueLabel(task.dueDate)}
+        {task.dueTime ? ` · ${task.dueTime}` : ''}
+      </span>
+    </div>
+  );
+}
+
 export function TaskRow({
   task,
   onOpen,
