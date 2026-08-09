@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { C, NARROW_MAX, SERIF, WIDE_BREAKPOINT, WIDE_MAX } from './tokens';
+import { C, NARROW_MAX, SERIF, TYPE, WIDE_BREAKPOINT, WIDE_MAX } from './tokens';
 import { useStore } from './store';
 import { BottomNav, RadialMenu, Scrim, type AddKind } from './components/Chrome';
 import { Sheet, type SheetState } from './components/Sheet';
@@ -36,6 +36,7 @@ const MAIN_VIEWS: Partial<Record<View, true>> = {
   projects: true,
 };
 
+/** Short names — the header shows these, and the back chevron reuses them. */
 const TITLES: Record<View, string> = {
   today: 'Today',
   projects: 'Projects',
@@ -167,7 +168,11 @@ export function App() {
       ? (activeProject?.name ?? 'Project')
       : view === 'personDetail'
         ? (activePerson?.name ?? 'Person')
-        : TITLES[view];
+        : // Today carries the greeting above it, so the headline can be the
+          // design's question rather than repeating the word.
+          view === 'today'
+          ? "What's brewing today?"
+          : TITLES[view];
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
@@ -286,10 +291,9 @@ export function App() {
               <div
                 style={{
                   fontSize: 12,
-                  letterSpacing: '.14em',
-                  textTransform: 'uppercase',
-                  color: C.muted,
-                  fontWeight: 600,
+                  letterSpacing: '.05em',
+                  color: C.clay,
+                  fontWeight: 700,
                 }}
               >
                 {greeting}
@@ -298,10 +302,10 @@ export function App() {
             <div
               style={{
                 fontFamily: SERIF,
-                fontSize: 29,
+                fontSize: view === 'today' ? TYPE.headline : TYPE.pageTitle,
                 fontWeight: 500,
                 letterSpacing: '-.01em',
-                marginTop: 2,
+                marginTop: 3,
                 lineHeight: 1.05,
               }}
             >

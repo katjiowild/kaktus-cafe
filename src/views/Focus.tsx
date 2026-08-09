@@ -3,6 +3,10 @@ import { DURATIONS, type FocusTimer } from '../lib/focus';
 
 const BG = `${import.meta.env.BASE_URL}focus/bg-focus.jpg`;
 
+/** The photo is busy behind the small print — a soft shadow keeps it readable
+ *  over foliage without darkening the whole scrim. */
+const LEGIBLE = { textShadow: '0 1px 4px rgba(10,14,10,.55)' } as const;
+
 const RADIUS = 112;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
@@ -156,10 +160,12 @@ export function Focus({
           }}
         >
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 500, color: '#fff' }}>
+            <div
+              style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 500, color: '#fff', ...LEGIBLE }}
+            >
               Focus time
             </div>
-            <div style={{ color: '#e9e4d8', fontSize: 12, marginTop: 2 }}>
+            <div style={{ color: '#e9e4d8', fontSize: 12, marginTop: 2, ...LEGIBLE }}>
               Take a breath. You've got this.
             </div>
           </div>
@@ -253,6 +259,7 @@ export function Focus({
                 fontSize: 12,
                 fontWeight: 600,
                 marginBottom: 9,
+                ...LEGIBLE,
               }}
             >
               Choose a session
@@ -295,6 +302,7 @@ export function Focus({
               color: '#e9e4d8',
               fontSize: 12,
               fontWeight: 600,
+              ...LEGIBLE,
             }}
           >
             <span style={{ display: 'flex', gap: 3 }}>

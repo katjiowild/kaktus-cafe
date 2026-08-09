@@ -18,6 +18,17 @@ export const C = {
   nudgeBg: '#f3ead0',
   nudgeBorder: '#e8dbb4',
   nudgeInk: '#94701c',
+  /** Sage tint — the daily-focus card and the "Projects active" stat tile. */
+  sageBg: '#e3ecdf',
+  sageBorder: '#cddbc7',
+  sageInk: '#4a6b52',
+  /** Rust tint — the "Tasks to do" stat tile. */
+  clayBg: '#f3e6df',
+  clayInk: '#7d5548',
+  /** Gold tint label, paired with nudgeBg. */
+  goldInk: '#8a6b26',
+  /** Chevrons and inactive glyphs. */
+  faint: '#c3bba9',
   /** OVERDUE flag. The prototype uses #c0492e throughout; the README table's
    *  #b23b2e appears only there, so the code wins. */
   overdue: '#c0492e',
@@ -45,7 +56,20 @@ export const TYPE_LABEL: Record<string, string> = {
   area: 'Area',
 };
 
-export const SERIF = "'Fraunces', serif";
+/** Zilla Slab carries every heading and display number; Inter does the rest. */
+export const SERIF = "'Zilla Slab', Georgia, serif";
+
+/** The display sizes the handoff names, so no view has to guess one. */
+export const TYPE = {
+  /** Page title in the header. */
+  pageTitle: 29,
+  /** Today's headline, one step up from the rest. */
+  headline: 30,
+  /** "Today at a glance", "Meetings", "Tasks" and friends. */
+  section: 17,
+  /** Project name on its detail page. */
+  projectName: 22,
+} as const;
 
 export const CARD_SHADOW = '0 1px 2px rgba(36,43,40,.05), 0 4px 14px rgba(36,43,40,.04)';
 export const CARD_SHADOW_LG = '0 1px 2px rgba(36,43,40,.05), 0 6px 18px rgba(36,43,40,.05)';
@@ -65,7 +89,7 @@ export const card: React.CSSProperties = {
 export const sectionHeader: React.CSSProperties = {
   fontFamily: SERIF,
   fontWeight: 500,
-  fontSize: 19,
+  fontSize: TYPE.section,
 };
 
 export const primaryBtn: React.CSSProperties = {

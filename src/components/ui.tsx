@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { C, CARD_SHADOW, SERIF, TYPE_BADGE, TYPE_LABEL } from '../tokens';
+import { C, CARD_SHADOW, SERIF, TYPE_BADGE, TYPE_LABEL, sectionHeader } from '../tokens';
 import type { ProjectType } from '../types';
 
 export function Check({ done, size = 12 }: { done: boolean; size?: number }) {
@@ -240,7 +240,7 @@ export function SectionHeader({ title, meta }: { title: string; meta?: ReactNode
         margin: '20px 2px 10px',
       }}
     >
-      <div style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 18 }}>{title}</div>
+      <div style={sectionHeader}>{title}</div>
       {meta !== undefined && (
         <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{meta}</span>
       )}
@@ -293,7 +293,54 @@ const NAV_PATHS: Record<string, string> = {
   tasks: 'M9 6h11 M9 12h11 M9 18h11 M4 6l1 1 2-2 M4 12l1 1 2-2 M4 18l1 1 2-2',
   focus: 'M6 8h10v6a5 5 0 01-5 5 5 5 0 01-5-5z M16 9h2a3 3 0 010 6h-2',
   more: 'M5 12h.01 M12 12h.01 M19 12h.01',
+  // Menu-row glyphs. Same 24×24, 1.9 stroke, round caps as the nav set —
+  // emoji sat outside the drawn language and read as a different app.
+  meetings: 'M4 5h16v15H4z M4 10h16 M8 3v4 M16 3v4',
+  people: 'M12 12a4 4 0 100-8 4 4 0 000 8z M4 20c0-4 4-6 8-6s8 2 8 6',
+  system: 'M12 3C7 3 3 7 3 12c5 0 9-4 9-9z M3 12c0 5 4 9 9 9',
+  archive: 'M4 7h16v13H4z M4 4h16v3H4z M10 11h4',
+  settings:
+    'M12 15a3 3 0 100-6 3 3 0 000 6z M5 12a7 7 0 01.3-2l-1.6-1.3 1.5-2.6 2 .6a7 7 0 011.7-1l.3-2h3l.3 2a7 7 0 011.7 1l2-.6 1.5 2.6L18 10a7 7 0 010 4l1.6 1.3-1.5 2.6-2-.6a7 7 0 01-1.7 1l-.3 2h-3l-.3-2a7 7 0 01-1.7-1l-2 .6-1.5-2.6L5 14a7 7 0 01-.3-2z',
 };
+
+/** Map-pin, for a meeting's location. Drawn, not the 📍 emoji, which rendered
+ *  in full colour and broke the line-icon language everywhere it appeared. */
+export function LocationIcon({ size = 13, color = C.muted }: { size?: number; color?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flexShrink: 0 }}
+    >
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0116 0z" />
+      <circle cx={12} cy={10} r={3} />
+    </svg>
+  );
+}
+
+export function FlameIcon({ size = 15, color = C.clay }: { size?: number; color?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flexShrink: 0 }}
+    >
+      <path d="M12 3c3 4 6 5.5 6 9a6 6 0 01-12 0c0-2 1-3.5 2.5-5 .3 1.2 1 2 2 2.3C10 7 11 4.5 12 3z" />
+    </svg>
+  );
+}
 
 export function HamburgerIcon({ size = 22 }: { size?: number }) {
   return (
@@ -369,14 +416,22 @@ export function PencilIcon({ size = 16, color = C.muted }: { size?: number; colo
   );
 }
 
-export function PinIcon({ pinned, size = 16 }: { pinned: boolean; size?: number }) {
+export function PinIcon({
+  pinned,
+  size = 16,
+  color = C.sage,
+}: {
+  pinned: boolean;
+  size?: number;
+  color?: string;
+}) {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill={pinned ? C.sage : 'none'}
-      stroke={pinned ? C.sage : C.muted}
+      fill={pinned ? color : 'none'}
+      stroke={pinned ? color : C.muted}
       strokeWidth={1.9}
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -417,8 +472,8 @@ export function Avatar({ name, size = 44 }: { name: string; size?: number }) {
         alignItems: 'center',
         justifyContent: 'center',
         fontFamily: SERIF,
-        fontSize: size * 0.41,
-        fontWeight: 500,
+        fontSize: size * 0.37,
+        fontWeight: 600,
         background: C.gold,
       }}
     >

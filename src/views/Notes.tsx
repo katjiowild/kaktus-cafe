@@ -101,9 +101,12 @@ export function Notes({ openSheet, wide }: ViewProps) {
                     letterSpacing: '.06em',
                     color: C.clay,
                     marginBottom: 5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
                   }}
                 >
-                  📌 PINNED
+                  <PinIcon pinned size={12} color={C.clay} /> PINNED
                 </div>
               )}
               <div style={{ fontWeight: 600, fontSize: 15 }}>{n.title}</div>

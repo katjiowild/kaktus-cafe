@@ -1,11 +1,11 @@
-import { C, SERIF } from '../tokens';
+import { C, SERIF, sectionHeader } from '../tokens';
 import { useAccountEmail, useStore } from '../store';
 import { isoDate, timeLabel } from '../lib/dates';
 import { projectMeta, sortOpenTasks } from '../lib/derive';
 import { Garden } from '../components/Garden';
 import { Plant } from '../components/Plant';
 import { TaskRow } from '../components/TaskRow';
-import { Card, EmptyState, SourceBadge } from '../components/ui';
+import { Card, EmptyState, LocationIcon, SourceBadge } from '../components/ui';
 import type { ViewProps } from './types';
 import { Linkify } from '../components/Linkify';
 
@@ -105,7 +105,7 @@ export function Today({ openProject, openSheet }: ViewProps) {
       ))}
 
       <div style={{ margin: '22px 2px 10px' }}>
-        <div style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 19 }}>Meetings</div>
+        <div style={sectionHeader}>Meetings</div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
         {todayMeetings.map((m) => (
@@ -137,7 +137,7 @@ export function Today({ openProject, openSheet }: ViewProps) {
                     gap: 4,
                   }}
                 >
-                  📍 <Linkify text={m.location} />
+                  <LocationIcon /> <Linkify text={m.location} />
                 </div>
               )}
               {notesFor(m.id).length > 0 && (
@@ -175,7 +175,7 @@ export function Today({ openProject, openSheet }: ViewProps) {
           margin: '20px 2px 10px',
         }}
       >
-        <div style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 19 }}>Tasks</div>
+        <div style={sectionHeader}>Tasks</div>
         <div style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>
           {todayTasks.length} to do
         </div>

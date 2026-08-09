@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { C, input, label, primaryBtn, SERIF } from '../tokens';
+import { C, input, label, primaryBtn, sectionHeader } from '../tokens';
 import { useStore } from '../store';
 import { clearAll } from '../db';
 import { shortDate } from '../lib/dates';
@@ -55,12 +55,7 @@ export function Settings() {
     }
   };
 
-  const h: React.CSSProperties = {
-    fontFamily: SERIF,
-    fontWeight: 500,
-    fontSize: 18,
-    margin: '20px 2px 10px',
-  };
+  const h: React.CSSProperties = { ...sectionHeader, margin: '20px 2px 10px' };
   const panel: React.CSSProperties = {
     background: C.card,
     border: `1px solid ${C.cardBorder}`,

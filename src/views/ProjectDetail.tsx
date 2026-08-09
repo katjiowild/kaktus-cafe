@@ -4,7 +4,7 @@ import { projectMeta, VITALITY_DOT, VITALITY_LABEL } from '../lib/derive';
 import { shortDate } from '../lib/dates';
 import { Plant } from '../components/Plant';
 import { TaskRow } from '../components/TaskRow';
-import { Checkbox, PencilIcon, SectionHeader, TypeBadge } from '../components/ui';
+import { Checkbox, NavIcon, PencilIcon, SectionHeader, TypeBadge } from '../components/ui';
 import type { ViewProps } from './types';
 import { Linkify } from '../components/Linkify';
 
@@ -109,7 +109,7 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, go }: ViewProp
                 fontWeight: 600,
               }}
             >
-              <span style={{ color: C.muted, fontSize: 11 }}>📅</span>
+              <NavIcon name="calendar" size={13} />
               {project.startDate ? shortDate(project.startDate) : '—'} →{' '}
               {project.endDate ? shortDate(project.endDate) : '—'}
             </div>

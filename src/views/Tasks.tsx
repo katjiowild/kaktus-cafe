@@ -1,4 +1,4 @@
-import { C, SERIF } from '../tokens';
+import { C, sectionHeader } from '../tokens';
 import { useStore } from '../store';
 import { sortOpenTasks } from '../lib/derive';
 import { TaskRow } from '../components/TaskRow';
@@ -25,7 +25,7 @@ export function Tasks({ openSheet }: ViewProps) {
           margin: '8px 2px 10px',
         }}
       >
-        <div style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 19 }}>All tasks</div>
+        <div style={sectionHeader}>All tasks</div>
         <div style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{open.length} open</div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>

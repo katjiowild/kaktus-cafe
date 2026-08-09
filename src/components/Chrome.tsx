@@ -115,9 +115,11 @@ export function RadialMenu({
   onToggle: () => void;
   onPick: (kind: AddKind) => void;
 }) {
+  // Below 460px the canvas is narrower than NARROW_MAX, so the old offset went
+  // negative and pushed the button half off the right edge — on every phone.
   const fabRight = wide
     ? `calc(max(0px, (100% - ${WIDE_MAX}px)/2) + 22px)`
-    : `calc(50% - ${NARROW_MAX / 2}px + 22px)`;
+    : `calc(max(0px, 50% - ${NARROW_MAX / 2}px) + 22px)`;
   const radius = 82;
   const angles = [198, 172, 146, 120, 94];
 
