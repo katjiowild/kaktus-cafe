@@ -18,6 +18,7 @@ const GROUP: Record<View, View> = {
   projectDetail: 'projects',
   calendar: 'calendar',
   notes: 'notes',
+  focus: 'more',
   more: 'more',
   tasks: 'more',
   meetings: 'more',

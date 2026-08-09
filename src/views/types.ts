@@ -4,6 +4,7 @@ export type View =
   | 'projectDetail'
   | 'calendar'
   | 'notes'
+  | 'focus'
   | 'more'
   | 'tasks'
   | 'meetings'

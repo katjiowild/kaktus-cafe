@@ -11,9 +11,11 @@ import { ProjectDetail } from './views/ProjectDetail';
 import { Tasks } from './views/Tasks';
 import { Notes } from './views/Notes';
 import { Calendar } from './views/Calendar';
+import { Focus } from './views/Focus';
 import { People, PersonDetail } from './views/People';
 import { Archive, Meetings, More, VisualSystem } from './views/Misc';
 import { Settings } from './views/Settings';
+import { useFocusTimer } from './lib/focus';
 import type { View, ViewProps } from './views/types';
 
 /** Two-pane master–detail when unfolded (owner-confirmed: Projects, People, Calendar). */
@@ -30,6 +32,7 @@ const TITLES: Record<View, string> = {
   projectDetail: 'Project',
   calendar: 'Calendar',
   notes: 'Notes',
+  focus: 'Focus',
   more: 'More',
   tasks: 'Tasks',
   meetings: 'Meetings',
@@ -63,6 +66,9 @@ export function App() {
   const [sheet, setSheet] = useState<SheetState | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const wide = useWide();
+  // Lifted out of the Focus view so a session keeps running while you go and
+  // look something up (v-phase2 §1).
+  const focusTimer = useFocusTimer(() => store.showToast('Session complete 🌱'));
 
   /**
    * Home-screen shortcuts land here as `?new=task` / `?new=meeting` (v6 §1) —
@@ -120,6 +126,9 @@ export function App() {
   const isPeoplePane = view === 'people' || view === 'personDetail';
   const twoPane = wide && Boolean(TWO_PANE[view]);
   const showBack = !wide && (view === 'projectDetail' || view === 'personDetail');
+  // Focus is the one full-bleed page — it replaces the cream chrome entirely,
+  // keeping only the bottom nav.
+  const isFocus = view === 'focus';
 
   const activeProject = store.projects.find((p) => p.id === activeProjectId);
   const activePerson = store.people.find((p) => p.id === activePersonId);
@@ -165,112 +174,127 @@ export function App() {
         boxShadow: '0 0 60px rgba(36,43,40,.12)',
       }}
     >
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 20,
-          padding: '18px 20px 10px',
-          background: 'linear-gradient(#f4f1e9 76%, rgba(244,241,233,0))',
-        }}
-      >
-        {showBack && (
-          <button
-            onClick={() => go(view === 'projectDetail' ? 'projects' : 'people')}
+      {!isFocus && (
+        <>
+          <header
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'none',
-              border: 'none',
-              color: C.softInk,
-              fontFamily: 'inherit',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              padding: '0 0 6px',
+              position: 'sticky',
+              top: 0,
+              zIndex: 20,
+              padding: '18px 20px 10px',
+              background: 'linear-gradient(#f4f1e9 76%, rgba(244,241,233,0))',
             }}
           >
-            ‹ {view === 'projectDetail' ? 'Projects' : 'People'}
-          </button>
-        )}
-        {view === 'today' && (
-          <div
-            style={{
-              fontSize: 12,
-              letterSpacing: '.14em',
-              textTransform: 'uppercase',
-              color: C.muted,
-              fontWeight: 600,
-            }}
+            {showBack && (
+              <button
+                onClick={() => go(view === 'projectDetail' ? 'projects' : 'people')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: 'none',
+                  border: 'none',
+                  color: C.softInk,
+                  fontFamily: 'inherit',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '0 0 6px',
+                }}
+              >
+                ‹ {view === 'projectDetail' ? 'Projects' : 'People'}
+              </button>
+            )}
+            {view === 'today' && (
+              <div
+                style={{
+                  fontSize: 12,
+                  letterSpacing: '.14em',
+                  textTransform: 'uppercase',
+                  color: C.muted,
+                  fontWeight: 600,
+                }}
+              >
+                {greeting}
+              </div>
+            )}
+            <div
+              style={{
+                fontFamily: SERIF,
+                fontSize: 29,
+                fontWeight: 500,
+                letterSpacing: '-.01em',
+                marginTop: 2,
+                lineHeight: 1.05,
+              }}
+            >
+              {headerTitle}
+            </div>
+            <button
+              onClick={() => setSearchOpen(true)}
+              title="Search"
+              aria-label="Search"
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 18,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 7,
+                color: C.softInk,
+                display: 'flex',
+              }}
+            >
+              <SearchIcon />
+            </button>
+          </header>
+
+          <main
+            style={
+              twoPane
+                ? { padding: '2px 20px 120px', display: 'flex', gap: 20, alignItems: 'flex-start' }
+                : { padding: '2px 16px 128px' }
+            }
           >
-            {greeting}
-          </div>
-        )}
-        <div
-          style={{
-            fontFamily: SERIF,
-            fontSize: 29,
-            fontWeight: 500,
-            letterSpacing: '-.01em',
-            marginTop: 2,
-            lineHeight: 1.05,
+            {view === 'today' && <Today {...props} />}
+            {view === 'tasks' && <Tasks {...props} />}
+            {view === 'notes' && <Notes {...props} />}
+            {view === 'calendar' && <Calendar {...props} />}
+            {view === 'meetings' && <Meetings {...props} />}
+            {view === 'more' && <More {...props} />}
+            {view === 'archive' && <Archive {...props} />}
+            {view === 'settings' && <Settings />}
+            {view === 'system' && <VisualSystem />}
+
+            {/* Two-pane: the list stays put and the detail fills the right pane. */}
+            {isProjectPane && (wide || view === 'projects') && <Projects {...props} />}
+            {isProjectPane && (wide || view === 'projectDetail') && <ProjectDetail {...props} />}
+            {isPeoplePane && (wide || view === 'people') && <People {...props} />}
+            {isPeoplePane && (wide || view === 'personDetail') && <PersonDetail {...props} />}
+          </main>
+
+          {radialOpen && <Scrim onClick={() => setRadialOpen(false)} />}
+
+          <RadialMenu
+            open={radialOpen}
+            wide={wide}
+            onToggle={() => setRadialOpen((o) => !o)}
+            onPick={onAdd}
+          />
+        </>
+      )}
+
+      {isFocus && (
+        <Focus
+          timer={focusTimer}
+          wide={wide}
+          onClose={() => {
+            focusTimer.reset();
+            go('today');
           }}
-        >
-          {headerTitle}
-        </div>
-        <button
-          onClick={() => setSearchOpen(true)}
-          title="Search"
-          aria-label="Search"
-          style={{
-            position: 'absolute',
-            top: 16,
-            right: 18,
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 7,
-            color: C.softInk,
-            display: 'flex',
-          }}
-        >
-          <SearchIcon />
-        </button>
-      </header>
-
-      <main
-        style={
-          twoPane
-            ? { padding: '2px 20px 120px', display: 'flex', gap: 20, alignItems: 'flex-start' }
-            : { padding: '2px 16px 128px' }
-        }
-      >
-        {view === 'today' && <Today {...props} />}
-        {view === 'tasks' && <Tasks {...props} />}
-        {view === 'notes' && <Notes {...props} />}
-        {view === 'calendar' && <Calendar {...props} />}
-        {view === 'meetings' && <Meetings {...props} />}
-        {view === 'more' && <More {...props} />}
-        {view === 'archive' && <Archive {...props} />}
-        {view === 'settings' && <Settings />}
-        {view === 'system' && <VisualSystem />}
-
-        {/* Two-pane: the list stays put and the detail fills the right pane. */}
-        {isProjectPane && (wide || view === 'projects') && <Projects {...props} />}
-        {isProjectPane && (wide || view === 'projectDetail') && <ProjectDetail {...props} />}
-        {isPeoplePane && (wide || view === 'people') && <People {...props} />}
-        {isPeoplePane && (wide || view === 'personDetail') && <PersonDetail {...props} />}
-      </main>
-
-      {radialOpen && <Scrim onClick={() => setRadialOpen(false)} />}
-
-      <RadialMenu
-        open={radialOpen}
-        wide={wide}
-        onToggle={() => setRadialOpen((o) => !o)}
-        onPick={onAdd}
-      />
+        />
+      )}
 
       <BottomNav view={view} wide={wide} onGo={go} />
 
