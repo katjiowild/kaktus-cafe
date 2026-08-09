@@ -228,7 +228,7 @@ export function Today({
       ))}
 
       <div style={{ margin: '22px 2px 10px' }}>
-        <div style={sectionHeader}>Meetings</div>
+        <div style={sectionHeader}>Up next</div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
         {todayMeetings.map((m) => (
@@ -298,7 +298,7 @@ export function Today({
           margin: '20px 2px 10px',
         }}
       >
-        <div style={sectionHeader}>Tasks</div>
+        <div style={sectionHeader}>Today's tasks</div>
         <div style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>
           {todayTasks.length} to do
         </div>
