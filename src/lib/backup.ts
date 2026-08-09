@@ -78,7 +78,12 @@ export async function importBackup(text: string): Promise<void> {
         db.settings.clear(),
       ]);
       await Promise.all([
-        db.projects.bulkAdd(b.projects!),
+        // A backup taken before Project.pinned existed restores after the
+        // migration has already run, so it has to be normalised here too —
+        // otherwise those projects come back with the field undefined.
+        db.projects.bulkAdd(
+          b.projects!.map((p) => ({ ...p, pinned: typeof p.pinned === 'boolean' ? p.pinned : false })),
+        ),
         db.tasks.bulkAdd(b.tasks!),
         db.notes.bulkAdd(b.notes!),
         db.meetings.bulkAdd(b.meetings!),

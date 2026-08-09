@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { db, getSetting, setSetting, uid } from './db';
+import { db, GARDEN_SLOTS, getSetting, setSetting, uid } from './db';
 import { isoDate, isoNow, nextOccurrence, parseDate, today } from './lib/dates';
 import {
   createGoogleEvent,
@@ -76,13 +76,23 @@ export interface Store extends Data {
   }) => Promise<string>;
   updateProject: (id: string, patch: Partial<Project>) => Promise<void>;
   completeProject: (id: string) => Promise<void>;
+  /** Park a project without finishing it. Separate from `reopenProject`, which
+   *  is the Archive's restore and says so in its toast. */
+  holdProject: (id: string) => Promise<void>;
+  resumeProject: (id: string) => Promise<void>;
+  /** Feature this project in the Garden, or take it out. Capped at GARDEN_SLOTS. */
+  toggleProjectPin: (id: string) => Promise<void>;
   reopenProject: (id: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
-  addMilestone: (projectId: string, text: string) => Promise<void>;
+  addMilestone: (projectId: string, text: string, date?: string | null) => Promise<void>;
+  setMilestoneDate: (
+    projectId: string,
+    milestoneId: string,
+    date: string | null,
+  ) => Promise<void>;
   toggleMilestone: (projectId: string, milestoneId: string) => Promise<void>;
   removeMilestone: (projectId: string, milestoneId: string) => Promise<void>;
   moveMilestone: (projectId: string, milestoneId: string, dir: -1 | 1) => Promise<void>;
-  addComment: (projectId: string, text: string) => Promise<void>;
   /** Project↔Person lives on Person.projectIds — one side, no duplicate field. */
   setProjectPeople: (projectId: string, personIds: string[]) => Promise<void>;
 
@@ -282,7 +292,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const now = isoNow();
         const milestones =
           type === 'active' && template !== 'blank' && template !== 'upkeep'
-            ? TEMPLATES[template].map((text) => ({ id: uid('ms'), text, done: false }))
+            ? TEMPLATES[template].map((text) => ({
+                id: uid('ms'),
+                text,
+                done: false,
+                date: null,
+              }))
             : [];
         const project: Project = {
           id,
@@ -295,8 +310,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           cadence: type === 'retainer' ? (cadence ?? 'weekly') : null,
           lastActivityDate: now,
           completedOn: null,
+          pinned: false,
           milestones,
-          comments: [],
           createdAt: now,
           updatedAt: now,
         };
@@ -339,7 +354,42 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           updatedAt: isoNow(),
         });
         await after();
-        showToast('Completed — moved to Archive');
+        showToast('Project marked completed 🎉');
+      },
+
+      async holdProject(id) {
+        await db.projects.update(id, { status: 'onhold', updatedAt: isoNow() });
+        await after();
+        showToast('Project put on hold');
+      },
+
+      async resumeProject(id) {
+        await db.projects.update(id, {
+          status: 'active',
+          // A parked project shouldn't come back already wilted for the time it
+          // spent parked — resuming counts as touching it.
+          lastActivityDate: isoNow(),
+          updatedAt: isoNow(),
+        });
+        await after();
+        showToast('Project resumed');
+      },
+
+      async toggleProjectPin(id) {
+        const project = await db.projects.get(id);
+        if (!project) return;
+        if (!project.pinned) {
+          // Counted from the database, not from `data`, so two quick taps can't
+          // both read a stale seven-minus-one and overfill the Garden.
+          const pinnedCount = await db.projects.filter((p) => p.pinned).count();
+          if (pinnedCount >= GARDEN_SLOTS) {
+            showToast('Garden is full — remove a plant first');
+            return;
+          }
+        }
+        await db.projects.update(id, { pinned: !project.pinned, updatedAt: isoNow() });
+        await after();
+        showToast(project.pinned ? 'Removed from the Garden' : 'Pinned to the Garden');
       },
 
       async reopenProject(id) {
@@ -371,13 +421,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         showToast('Project deleted — its tasks and notes were kept');
       },
 
-      async addMilestone(projectId, text) {
+      async addMilestone(projectId, text, date = null) {
         const p = await db.projects.get(projectId);
         if (!p) return;
         await db.projects.update(projectId, {
-          milestones: [...p.milestones, { id: uid('ms'), text, done: false }],
+          milestones: [...p.milestones, { id: uid('ms'), text, done: false, date }],
         });
         await touchProject(projectId);
+        await after();
+      },
+
+      async setMilestoneDate(projectId, milestoneId, date) {
+        const p = await db.projects.get(projectId);
+        if (!p) return;
+        await db.projects.update(projectId, {
+          milestones: p.milestones.map((ms) => (ms.id === milestoneId ? { ...ms, date } : ms)),
+        });
         await after();
       },
 
@@ -415,17 +474,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         [list[i], list[j]] = [list[j], list[i]];
         await db.projects.update(projectId, { milestones: list });
         await after();
-      },
-
-      async addComment(projectId, text) {
-        const p = await db.projects.get(projectId);
-        if (!p) return;
-        await db.projects.update(projectId, {
-          comments: [{ id: uid('c'), at: isoNow(), text }, ...p.comments],
-        });
-        await touchProject(projectId);
-        await after();
-        showToast('Saved');
       },
 
       async setProjectPeople(projectId, personIds) {

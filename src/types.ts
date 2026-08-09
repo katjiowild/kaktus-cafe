@@ -1,8 +1,8 @@
 // The v1 data model. Records are flat collections keyed by string id, so a v2
 // backend (Supabase table or SQLite table per collection) is an additive port,
-// not a rewrite. Owned children (milestones, comments, subtasks, log entries)
-// are embedded arrays but each carries its own id, so they lift cleanly into
-// child tables with a parent foreign key when that day comes.
+// not a rewrite. Owned children (milestones, subtasks) are embedded arrays, but
+// each carries its own id, so they lift cleanly into child tables with a parent
+// foreign key when that day comes.
 
 export type ProjectType = 'active' | 'retainer' | 'area';
 
@@ -15,13 +15,8 @@ export interface Milestone {
   id: string;
   text: string;
   done: boolean;
-}
-
-export interface ProjectComment {
-  id: string;
-  /** ISO datetime. */
-  at: string;
-  text: string;
+  /** Optional target date, ISO yyyy-mm-dd. Shown under the label. */
+  date: string | null;
 }
 
 export interface Project {
@@ -39,8 +34,9 @@ export interface Project {
   lastActivityDate: string;
   /** ISO date, set when status becomes 'done'. */
   completedOn: string | null;
+  /** Featured on the Garden page. At most GARDEN_SLOTS projects at a time. */
+  pinned: boolean;
   milestones: Milestone[];
-  comments: ProjectComment[];
   createdAt: string;
   updatedAt: string;
 }

@@ -149,8 +149,76 @@ class KaktusDB extends Dexie {
             if (t.dueTime === undefined) t.dueTime = null;
           });
       });
+
+    // v8 — Project.pinned (Phase 2). Backfilled to false so nothing arrives in
+    // the Garden unasked, and no consumer reads `undefined` for a boolean.
+    this.version(8)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx
+          .table<Project>('projects')
+          .toCollection()
+          .modify((p) => {
+            if (typeof p.pinned !== 'boolean') p.pinned = false;
+          });
+      });
+
+    // v9 — Milestone.date. Backfilled to null so a milestone written before
+    // dates existed reads as "no date" rather than undefined.
+    this.version(9)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx
+          .table<Project>('projects')
+          .toCollection()
+          .modify((p) => {
+            for (const ms of p.milestones ?? []) {
+              if (ms.date === undefined) ms.date = null;
+            }
+          });
+      });
+
+    // v10 — "Notes to self" folds into Notes, the same way meeting notes did in
+    // v5 and the person log did in v6. Each comment becomes a real note on its
+    // project, so nothing written is lost when the section goes.
+    this.version(10)
+      .stores({})
+      .upgrade(async (tx) => {
+        const notes = tx.table<Note>('notes');
+        // The shape as it was before this version — the type is gone from the
+        // model, so the migration carries its own description of it.
+        type LegacyComment = { id: string; at: string; text: string };
+        const projects = tx.table<Project & { comments?: LegacyComment[] }>('projects');
+        const all = await projects.toArray();
+        const now = new Date().toISOString();
+
+        for (const p of all) {
+          for (const c of p.comments ?? []) {
+            const text = typeof c?.text === 'string' ? c.text.trim() : '';
+            if (!text) continue;
+            await notes.add({
+              id: `note_${crypto.randomUUID().slice(0, 12)}`,
+              title: `Note on ${p.name}`,
+              body: text,
+              projectId: p.id,
+              personIds: [],
+              meetingId: null,
+              date: (c.at ?? now).slice(0, 10),
+              pinned: false,
+              createdAt: c.at ?? now,
+              updatedAt: now,
+            });
+          }
+        }
+        await projects.toCollection().modify((p) => {
+          delete (p as Project & { comments?: unknown }).comments;
+        });
+      });
   }
 }
+
+/** How many projects the Garden can show at once. */
+export const GARDEN_SLOTS = 7;
 
 export const db = new KaktusDB();
 

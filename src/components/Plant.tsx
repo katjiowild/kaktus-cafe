@@ -2,9 +2,7 @@ import type { ProjectType } from '../types';
 import type { Vitality } from '../lib/derive';
 
 /**
- * The succulent — a pure function of (stage, vitality, species, size) → SVG.
- * Ported from the design package's Plant.dc.html; palettes and geometry are
- * unchanged.
+ * The succulent — a pure function of (stage, vitality, species, size).
  *
  * Two independent dimensions (§5.2):
  *   stage 1–5  = size/fullness, from progress. Never reduced by neglect.
@@ -13,59 +11,45 @@ import type { Vitality } from '../lib/derive';
  *
  * Species by project type: active = echeveria, retainer = aeonium,
  * area = dracaena.
+ *
+ * Echeveria and aeonium are the Phase 2 illustrations, one file per level and
+ * vitality state. Dracaena has no illustration in that set, so areas keep the
+ * drawn SVG below — which costs nothing in practice, since areas are always
+ * healthy and sit at a fixed stage.
  */
+
+/** Four illustrated levels against five growth stages: the top two share one. */
+const ILLUSTRATED: Partial<Record<ProjectType, string>> = {
+  active: 'echeveria',
+  retainer: 'aeonium',
+};
+
+/**
+ * The illustrations come in two states, not four. That matches how the rest of
+ * the app reads vitality — `needsWater` is yellowing-or-worse — so the split
+ * lands in the same place as the Today nudge and the neglect banner.
+ */
+function illustrationFor(species: ProjectType, stage: number, vitality: Vitality): string | null {
+  const name = ILLUSTRATED[species];
+  if (!name) return null;
+  const level = Math.max(1, Math.min(4, Math.round(stage)));
+  const state = vitality === 'yellowing' || vitality === 'browning' ? 'neglected' : 'healthy';
+  return `${import.meta.env.BASE_URL}succulents/${name}-l${level}-${state}.png`;
+}
 
 type Palette = { deep: string; mid: string; light: string; tip: string };
 
-const PAL: Record<ProjectType, Record<Vitality, Palette>> = {
-  active: {
-    // echeveria — blue-green rosette, rosy tips
-    healthy: { deep: '#3f6b57', mid: '#75a086', light: '#a6c9a8', tip: '#e0a9a0' },
-    dry: { deep: '#5c6440', mid: '#8a9264', light: '#b6bd8c', tip: '#cdb583' },
-    yellowing: { deep: '#8a7332', mid: '#c2a24d', light: '#ddc272', tip: '#e6d495' },
-    browning: { deep: '#6f4a30', mid: '#9a6b48', light: '#bb8b63', tip: '#c9a681' },
-  },
-  retainer: {
-    // aeonium — deep green rosettes, burgundy edge
-    healthy: { deep: '#33203c', mid: '#6d3f6b', light: '#915f8a', tip: '#c98fb4' },
-    dry: { deep: '#47502e', mid: '#727d45', light: '#9aa564', tip: '#8a5a48' },
-    yellowing: { deep: '#786a2c', mid: '#b39730', light: '#d3bd5c', tip: '#b78a3e' },
-    browning: { deep: '#5a3d26', mid: '#875d3d', light: '#a67d56', tip: '#7a4432' },
-  },
-  area: {
-    // dracaena — spiky fountain, red-orange edges
-    healthy: { deep: '#3a5f43', mid: '#5f9058', light: '#8bb56f', tip: '#c66a34' },
-    dry: { deep: '#525d3c', mid: '#7d8a50', light: '#a6b06b', tip: '#bd8a44' },
-    yellowing: { deep: '#786a2e', mid: '#bda23c', light: '#d8c25c', tip: '#c99a3f' },
-    browning: { deep: '#5a3f28', mid: '#8a603c', light: '#a98056', tip: '#8a4a2c' },
-  },
+/** Dracaena only — the other two species are illustrations now. */
+const DRACAENA: Record<Vitality, Palette> = {
+  healthy: { deep: '#3a5f43', mid: '#5f9058', light: '#8bb56f', tip: '#c66a34' },
+  dry: { deep: '#525d3c', mid: '#7d8a50', light: '#a6b06b', tip: '#bd8a44' },
+  yellowing: { deep: '#786a2e', mid: '#bda23c', light: '#d8c25c', tip: '#c99a3f' },
+  browning: { deep: '#5a3f28', mid: '#8a603c', light: '#a98056', tip: '#8a4a2c' },
 };
 
 const leaf = (len: number, wid: number, tip = 0) =>
   `M0 0 C ${-wid} ${-len * 0.45}, ${-wid * 0.45} ${-len}, ${tip} ${-len} ` +
   `C ${wid * 0.45} ${-len}, ${wid} ${-len * 0.45}, 0 0 Z`;
-
-const ECHEVERIA_RINGS: Record<number, { len: number; wid: number; n: number }[]> = {
-  1: [{ len: 18, wid: 10, n: 6 }],
-  2: [
-    { len: 24, wid: 12, n: 8 },
-    { len: 15, wid: 9, n: 5 },
-  ],
-  3: [
-    { len: 28, wid: 13, n: 9 },
-    { len: 18, wid: 10, n: 6 },
-  ],
-  4: [
-    { len: 31, wid: 14, n: 10 },
-    { len: 20, wid: 11, n: 7 },
-    { len: 12, wid: 8, n: 5 },
-  ],
-  5: [
-    { len: 33, wid: 14, n: 11 },
-    { len: 22, wid: 11, n: 8 },
-    { len: 13, wid: 8, n: 5 },
-  ],
-};
 
 export interface PlantProps {
   stage: number;
@@ -79,7 +63,34 @@ export interface PlantProps {
 
 export function Plant({ stage, vitality, species, size = 76, onClick, style, title }: PlantProps) {
   const st = Math.max(1, Math.min(5, Math.round(stage)));
-  const c = PAL[species][vitality];
+  const art = illustrationFor(species, st, vitality);
+
+  if (art) {
+    return (
+      <div
+        onClick={onClick}
+        title={title}
+        style={{
+          position: 'relative',
+          width: size,
+          height: size * 1.08,
+          display: 'inline-block',
+          cursor: onClick ? 'pointer' : undefined,
+          ...style,
+        }}
+      >
+        <img
+          src={art}
+          alt={`${species} plant, growth stage ${st}, ${vitality}`}
+          // contain, never crop — the pot and the bloom both matter, and the
+          // illustrations aren't all the same aspect ratio.
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+        />
+      </div>
+    );
+  }
+
+  const c = DRACAENA[vitality];
   const groupOp = vitality === 'browning' ? 0.9 : vitality === 'yellowing' ? 0.97 : 1;
   const kids: React.ReactNode[] = [];
   let ki = 0;
@@ -88,64 +99,8 @@ export function Plant({ stage, vitality, species, size = 76, onClick, style, tit
 
   kids.push(<ellipse key="sh" cx={50} cy={103} rx={20} ry={3.4} fill="rgba(40,38,26,.13)" />);
 
-  if (species === 'active') {
-    const cx = 50;
-    const cy = 74;
-    const fills = [c.mid, c.light, c.tip];
-    ECHEVERIA_RINGS[st].forEach((ring, ri) => {
-      const fill = fills[Math.min(ri, fills.length - 1)];
-      for (let i = 0; i < ring.n; i++) {
-        const ang = i * (360 / ring.n) + ri * 20;
-        path(leaf(ring.len, ring.wid), {
-          fill,
-          stroke: c.deep,
-          strokeWidth: 0.5,
-          transform: `translate(${cx} ${cy}) rotate(${ang})`,
-        });
-      }
-    });
-    kids.push(
-      <circle key="bud" cx={cx} cy={cy - 2} r={3.4} fill={c.tip} stroke={c.deep} strokeWidth={0.5} />,
-    );
-    if (st === 5) kids.push(<circle key="bloom" cx={cx} cy={cy - 2} r={1.6} fill="#f2d9a0" />);
-  } else if (species === 'retainer') {
-    const count = st <= 1 ? 1 : st <= 3 ? 2 : 3;
-    const spots = [
-      { x: 50, y: 56, s: 1 },
-      { x: 33, y: 70, s: 0.74 },
-      { x: 66, y: 66, s: 0.66 },
-    ].slice(0, count);
-
-    spots.forEach((sp) => {
-      const midx = (50 + sp.x) / 2 + (sp.x - 50) * 0.25;
-      const midy = (101 + sp.y) / 2;
-      path(`M50 101 Q ${midx} ${midy} ${sp.x} ${sp.y}`, {
-        fill: 'none',
-        stroke: c.deep,
-        strokeWidth: 3.4 * sp.s,
-        strokeLinecap: 'round',
-      });
-    });
-    spots.forEach((sp) => {
-      const n = 13;
-      const len = 15 * sp.s;
-      const wid = 3.4 * sp.s;
-      for (let i = 0; i < n; i++) {
-        const ang = i * (360 / n);
-        path(leaf(len, wid), {
-          fill: c.mid,
-          stroke: c.tip,
-          strokeWidth: 0.6,
-          transform: `translate(${sp.x} ${sp.y}) rotate(${ang})`,
-        });
-      }
-      kids.push(<circle key={`ac${sp.x}`} cx={sp.x} cy={sp.y} r={3.2 * sp.s} fill={c.deep} />);
-    });
-    if (st === 5) {
-      const sp = spots[0];
-      kids.push(<circle key="ab" cx={sp.x} cy={sp.y - 1} r={1.8} fill={c.tip} />);
-    }
-  } else {
+  {
+    // Dracaena — spiky fountain, red-orange edges.
     const crowns = [{ x: 50, y: 54, s: 1 }];
     if (st >= 4) crowns.push({ x: 62, y: 66, s: 0.7 });
     if (st >= 5) crowns.push({ x: 40, y: 64, s: 0.66 });

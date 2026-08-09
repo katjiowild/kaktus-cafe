@@ -171,11 +171,12 @@ export function App() {
   const showBack =
     back !== null && !(wide && (view === 'projectDetail' || view === 'personDetail'));
 
-  const activeProject = store.projects.find((p) => p.id === activeProjectId);
   const activePerson = store.people.find((p) => p.id === activePersonId);
+  // Project detail carries its own header row — thumbnail, name, status pill —
+  // so the chrome only supplies the back chevron above it.
   const headerTitle =
     view === 'projectDetail'
-      ? (activeProject?.name ?? 'Project')
+      ? ''
       : view === 'personDetail'
         ? (activePerson?.name ?? 'Person')
         : // Today carries the greeting above it, so the headline can be the
@@ -361,7 +362,6 @@ export function App() {
       {isFocus && (
         <Focus
           timer={focusTimer}
-          wide={wide}
           onClose={() => {
             focusTimer.reset();
             go('today');
