@@ -9,19 +9,22 @@ import { Checkbox, OverdueFlag, ProjectChip, UrgentFlag } from './ui';
  * by a hairline rather than floating as separate cards, and the due date sits
  * right-aligned instead of in a meta row beneath the title.
  *
- * Deliberately carries less than {@link TaskRow} — no project chip, recurrence
- * mark or subtask affordance. Overdue reads as red on the date, as in the
- * design; urgency keeps its badge because it reorders the list and would
- * otherwise be invisible. Everything else is a tap away in the task itself.
+ * Carries less than {@link TaskRow} — no project chip or recurrence mark.
+ * Overdue reads as red on the date, as in the design; urgency keeps its badge
+ * because it reorders the list and would otherwise be invisible. Subtasks nest
+ * underneath, indented past the checkbox, so a task that's really several
+ * steps still reads as several steps here.
  */
 export function TaskLine({
   task,
   last,
   onOpen,
+  onAddSubtask,
 }: {
   task: Task;
   last: boolean;
   onOpen: () => void;
+  onAddSubtask?: () => void;
 }) {
   const store = useStore();
   const overdue = isOverdue(task.dueDate, task.done);
@@ -29,14 +32,12 @@ export function TaskLine({
   return (
     <div
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
         padding: '13px 15px',
         borderBottom: last ? 'none' : `1px solid ${C.paper2}`,
         opacity: task.done ? 0.55 : 1,
       }}
     >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <Checkbox
         done={task.done}
         size={20}
@@ -59,18 +60,64 @@ export function TaskLine({
       >
         {task.title}
       </div>
-      {task.urgent && !task.done && <UrgentFlag />}
-      <span
-        style={{
-          flexShrink: 0,
-          fontSize: 12,
-          fontWeight: 600,
-          color: overdue ? C.overdue : C.muted,
-        }}
-      >
-        {dueLabel(task.dueDate)}
-        {task.dueTime ? ` · ${task.dueTime}` : ''}
-      </span>
+        {task.urgent && !task.done && <UrgentFlag />}
+        <span
+          style={{
+            flexShrink: 0,
+            fontSize: 12,
+            fontWeight: 600,
+            color: overdue ? C.overdue : C.muted,
+          }}
+        >
+          {dueLabel(task.dueDate)}
+          {task.dueTime ? ` · ${task.dueTime}` : ''}
+        </span>
+      </div>
+
+      {/* Only tasks that already have steps get the nested block. Putting an
+          "add subtask" line under every row would undo the tight stacking;
+          the first one is added from the task itself. */}
+      {task.subtasks.length > 0 && (
+        <div style={{ margin: '9px 0 1px 32px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {task.subtasks.map((s) => (
+            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <Checkbox
+                done={s.done}
+                size={16}
+                radius={8}
+                onClick={() => void store.toggleSubtask(task.id, s.id)}
+              />
+              <span
+                style={{
+                  fontSize: 13,
+                  color: s.done ? C.muted : C.softInk,
+                  textDecoration: s.done ? 'line-through' : 'none',
+                }}
+              >
+                {s.text}
+              </span>
+            </div>
+          ))}
+          {onAddSubtask && (
+            <button
+              onClick={onAddSubtask}
+              style={{
+                alignSelf: 'flex-start',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                fontFamily: 'inherit',
+                fontSize: 12.5,
+                color: C.clay,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              + Add subtask
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

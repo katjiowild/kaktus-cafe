@@ -25,6 +25,7 @@ export interface ViewProps {
   openSheet: (s: SheetState) => void;
   activeProjectId: string | null;
   activePersonId: string | null;
-  /** Focus sessions finished today — Today's focus card reports it. */
-  focusSessions: number;
+  /** Today's intention — written on Today's focus card, read on the Focus page. */
+  focusIntention: string;
+  setFocusIntention: (text: string) => void;
 }

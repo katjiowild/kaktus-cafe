@@ -72,7 +72,7 @@ export function Focus({
   wide: boolean;
   onClose: () => void;
 }) {
-  const { duration, remaining, fraction, running, sessionsToday, setDuration, toggle } = timer;
+  const { duration, remaining, fraction, running, intention, setDuration, toggle } = timer;
   const ring = useRef<SVGCircleElement>(null);
 
   /**
@@ -114,6 +114,11 @@ export function Focus({
             }
           : { left: 0, right: 0, maxWidth: NARROW_MAX, margin: '0 auto' }),
         overflow: 'hidden',
+        // Everything on this page is white text sized for a dark photo. Until
+        // the image arrives — cold load, slow connection, or it never loads —
+        // that leaves the page unreadable, so the dark base goes underneath it
+        // rather than the photo being the only thing holding the contrast.
+        backgroundColor: '#1e2a1c',
         backgroundImage: `url(${BG})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center bottom',
@@ -315,34 +320,30 @@ export function Focus({
             </div>
           </div>
 
-          {/* Session history only — the garden's growth is task-driven and this
-              deliberately doesn't feed it. */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 7,
-              color: '#e9e4d8',
-              fontSize: 12,
-              fontWeight: 600,
-              ...LEGIBLE,
-            }}
-          >
-            <span style={{ display: 'flex', gap: 3 }}>
-              {[0, 1, 2, 3].map((i) => (
-                <span
-                  key={i}
-                  style={{ display: 'flex', color: '#fff', opacity: i < sessionsToday ? 1 : 0.3 }}
-                >
-                  <SproutGlyph />
-                </span>
-              ))}
-            </span>
-            {sessionsToday > 4 && <span>+{sessionsToday - 4}</span>}
-            <span style={{ opacity: 0.8 }}>
-              {sessionsToday === 1 ? '1 session today' : `${sessionsToday} sessions today`}
-            </span>
-          </div>
+          {/* What she set out to do today, written on Today. Only shown when
+              there is one — an empty prompt here would just be clutter while
+              a session runs. */}
+          {intention && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'center',
+                gap: 8,
+                maxWidth: 300,
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 600,
+                lineHeight: 1.45,
+                ...LEGIBLE,
+              }}
+            >
+              <span style={{ display: 'flex', flexShrink: 0, marginTop: 1, opacity: 0.85 }}>
+                <SproutGlyph size={15} />
+              </span>
+              <span>{intention}</span>
+            </div>
+          )}
         </div>
 
         {/* Clears the fixed bottom nav. */}

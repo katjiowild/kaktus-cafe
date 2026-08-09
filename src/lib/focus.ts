@@ -17,6 +17,13 @@ interface SessionCount {
   count: number;
 }
 
+/** What she's set out to do today. Dated, so it clears itself overnight
+ *  instead of yesterday's intention greeting her in the morning. */
+interface Intention {
+  date: string;
+  text: string;
+}
+
 export interface FocusTimer {
   /** Chosen session length, in minutes. */
   duration: number;
@@ -32,6 +39,9 @@ export interface FocusTimer {
   running: boolean;
   /** Sessions finished today — resets itself when the date rolls over. */
   sessionsToday: number;
+  /** Today's intention, set on Today and shown on the Focus page. */
+  intention: string;
+  setIntention: (text: string) => void;
   setDuration: (minutes: number) => void;
   /** Start, or pause if already running. */
   toggle: () => void;
@@ -52,6 +62,7 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
   const [remaining, setRemaining] = useState(DEFAULT_DURATION * 60);
   const [running, setRunning] = useState(false);
   const [sessionsToday, setSessionsToday] = useState(0);
+  const [intention, setIntentionState] = useState('');
 
   const deadline = useRef<number | null>(null);
   const river = useRef<HTMLAudioElement | null>(null);
@@ -63,9 +74,10 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
   // day is stale by definition, so it reads as zero rather than being carried.
   useEffect(() => {
     void (async () => {
-      const [saved, sessions] = await Promise.all([
+      const [saved, sessions, aim] = await Promise.all([
         getSetting<number>('focus.duration', DEFAULT_DURATION),
         getSetting<SessionCount | null>('focus.sessions', null),
+        getSetting<Intention | null>('focus.intention', null),
       ]);
       const mins = DURATIONS.includes(saved as (typeof DURATIONS)[number])
         ? saved
@@ -73,7 +85,14 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
       setDurationState(mins);
       setRemaining(mins * 60);
       if (sessions && sessions.date === isoDate()) setSessionsToday(sessions.count);
+      if (aim && aim.date === isoDate()) setIntentionState(aim.text);
     })();
+  }, []);
+
+  const setIntention = useCallback((text: string) => {
+    const trimmed = text.trim();
+    setIntentionState(trimmed);
+    void setSetting('focus.intention', { date: isoDate(), text: trimmed } satisfies Intention);
   }, []);
 
   const stopAudio = useCallback(() => {
@@ -169,5 +188,16 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
     setRemaining(duration * 60);
   }, [duration, stopAudio]);
 
-  return { duration, remaining, fraction, running, sessionsToday, setDuration, toggle, reset };
+  return {
+    duration,
+    remaining,
+    fraction,
+    running,
+    sessionsToday,
+    intention,
+    setIntention,
+    setDuration,
+    toggle,
+    reset,
+  };
 }

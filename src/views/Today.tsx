@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { C, SERIF, sectionHeader } from '../tokens';
 import { useAccountEmail, useStore } from '../store';
 import { isoDate, timeLabel } from '../lib/dates';
@@ -8,7 +9,17 @@ import { Card, EmptyState, LocationIcon, NavIcon, SourceBadge } from '../compone
 import type { ViewProps } from './types';
 import { Linkify } from '../components/Linkify';
 
-export function Today({ openProject, openSheet, go, focusSessions }: ViewProps) {
+export function Today({
+  openProject,
+  openSheet,
+  go,
+  focusIntention,
+  setFocusIntention,
+}: ViewProps) {
+  const [editingFocus, setEditingFocus] = useState(false);
+  // Escape has to beat the blur handler, which would otherwise save on the
+  // way out and make cancelling impossible.
+  const cancelled = useRef(false);
   const store = useStore();
   const accountEmail = useAccountEmail();
   const { projects, tasks, meetings, notes, dismissed } = store;
@@ -31,13 +42,10 @@ export function Today({ openProject, openSheet, go, focusSessions }: ViewProps) 
 
   return (
     <div style={{ animation: 'sbfade .3s ease' }}>
-      {/* Today's focus — the design's sage card, opening the Focus timer
-          rather than logging a line of text (owner's call). */}
-      <button
-        onClick={() => go('focus')}
+      {/* Today's focus — write the day's intention here; the Focus page shows
+          it back while a session runs. The round button opens that page. */}
+      <div
         style={{
-          width: '100%',
-          textAlign: 'left',
           display: 'flex',
           alignItems: 'center',
           gap: 13,
@@ -46,8 +54,6 @@ export function Today({ openProject, openSheet, go, focusSessions }: ViewProps) 
           borderRadius: 16,
           padding: '15px 16px',
           margin: '6px 0 20px',
-          cursor: 'pointer',
-          fontFamily: 'inherit',
         }}
       >
         <span
@@ -65,29 +71,76 @@ export function Today({ openProject, openSheet, go, focusSessions }: ViewProps) 
         >
           <NavIcon name="focus" size={22} />
         </span>
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span
-            style={{ display: 'block', fontWeight: 600, fontSize: 15, color: C.deepSage }}
+
+        {editingFocus ? (
+          <input
+            autoFocus
+            defaultValue={focusIntention}
+            placeholder="How will you grow today?"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+              if (e.key === 'Escape') {
+                cancelled.current = true;
+                e.currentTarget.blur();
+              }
+            }}
+            onBlur={(e) => {
+              if (!cancelled.current) setFocusIntention(e.target.value);
+              cancelled.current = false;
+              setEditingFocus(false);
+            }}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              background: C.card,
+              border: `1px solid ${C.sageBorder}`,
+              borderRadius: 9,
+              padding: '9px 11px',
+              fontFamily: 'inherit',
+              fontSize: 14,
+              color: C.deepSage,
+              outline: 'none',
+            }}
+          />
+        ) : (
+          <button
+            onClick={() => setEditingFocus(true)}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              textAlign: 'left',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
           >
-            Today's focus
-          </span>
-          <span style={{ display: 'block', fontSize: 12.5, color: C.softInk, marginTop: 1 }}>
-            {focusSessions === 0
-              ? 'Start a session when you’re ready'
-              : `${focusSessions} session${focusSessions === 1 ? '' : 's'} done today`}
-          </span>
-        </span>
-        <span
+            <span style={{ display: 'block', fontWeight: 600, fontSize: 15, color: C.deepSage }}>
+              {focusIntention || "Today's focus"}
+            </span>
+            <span style={{ display: 'block', fontSize: 12.5, color: C.softInk, marginTop: 1 }}>
+              {focusIntention ? 'Tap to edit' : 'How will you grow today?'}
+            </span>
+          </button>
+        )}
+
+        <button
+          onClick={() => go('focus')}
+          aria-label="Open the focus timer"
+          title="Open the focus timer"
           style={{
             width: 34,
             height: 34,
             borderRadius: '50%',
+            border: 'none',
             background: C.sage,
             color: '#fff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
+            cursor: 'pointer',
           }}
         >
           <svg
@@ -102,8 +155,8 @@ export function Today({ openProject, openSheet, go, focusSessions }: ViewProps) 
           >
             <path d="M9 5l7 7-7 7" />
           </svg>
-        </span>
-      </button>
+        </button>
+      </div>
 
       {nudges.map(({ project, meta }) => (
         <div
@@ -265,6 +318,16 @@ export function Today({ openProject, openSheet, go, focusSessions }: ViewProps) 
               task={t}
               last={i === todayTasks.length - 1}
               onOpen={() => openSheet({ type: 'task', taskId: t.id })}
+              onAddSubtask={() =>
+                openSheet({
+                  type: 'mini',
+                  kind: 'subtask',
+                  ctx: t.id,
+                  title: 'Add subtask',
+                  label: 'Subtask',
+                  placeholder: 'Break it into a small step',
+                })
+              }
             />
           ))}
         </div>

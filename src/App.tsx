@@ -138,10 +138,11 @@ export function App() {
       openSheet,
       activeProjectId,
       activePersonId,
-      focusSessions: focusTimer.sessionsToday,
+      focusIntention: focusTimer.intention,
+      setFocusIntention: focusTimer.setIntention,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [wide, activeProjectId, activePersonId, focusTimer.sessionsToday],
+    [wide, activeProjectId, activePersonId, focusTimer.intention, focusTimer.setIntention],
   );
 
   const isProjectPane = view === 'projects' || view === 'projectDetail';
