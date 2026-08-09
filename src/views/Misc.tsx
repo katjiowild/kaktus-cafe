@@ -212,7 +212,6 @@ export function Archive({ openProject }: ViewProps) {
 
 const MORE: { view: View; label: string; sub: string; glyph: React.ReactNode }[] = [
   { view: 'tasks', label: 'Tasks', sub: 'Every open & completed task', glyph: '✓' },
-  { view: 'focus', label: 'Focus', sub: 'A timed session with the river on', glyph: '☕' },
   { view: 'meetings', label: 'Meetings', sub: 'Everything on the books', glyph: '🗓️' },
   { view: 'people', label: 'People', sub: 'Your light CRM', glyph: <PersonIcon /> },
   { view: 'system', label: 'Visual system', sub: 'Plants, types & the radial menu', glyph: '❋' },

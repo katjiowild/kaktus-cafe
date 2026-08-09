@@ -291,8 +291,27 @@ const NAV_PATHS: Record<string, string> = {
   calendar: 'M4 5h16v16H4z M4 10h16 M8 3v4 M16 3v4',
   notes: 'M6 3h9l3 3v15H6z M14 3v4h4',
   tasks: 'M9 6h11 M9 12h11 M9 18h11 M4 6l1 1 2-2 M4 12l1 1 2-2 M4 18l1 1 2-2',
+  focus: 'M6 8h10v6a5 5 0 01-5 5 5 5 0 01-5-5z M16 9h2a3 3 0 010 6h-2',
   more: 'M5 12h.01 M12 12h.01 M19 12h.01',
 };
+
+export function HamburgerIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+      strokeLinecap="round"
+    >
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h16" />
+    </svg>
+  );
+}
 
 export function NavIcon({ name, size = 22 }: { name: string; size?: number }) {
   const segments = NAV_PATHS[name].split(' M');

@@ -3,7 +3,7 @@ import { C, NARROW_MAX, SERIF, WIDE_BREAKPOINT, WIDE_MAX } from './tokens';
 import { useStore } from './store';
 import { BottomNav, RadialMenu, Scrim, type AddKind } from './components/Chrome';
 import { Sheet, type SheetState } from './components/Sheet';
-import { SearchIcon, Toast } from './components/ui';
+import { HamburgerIcon, SearchIcon, Toast } from './components/ui';
 import { Search } from './components/Search';
 import { Today } from './views/Today';
 import { Projects } from './views/Projects';
@@ -24,6 +24,16 @@ const TWO_PANE: Partial<Record<View, true>> = {
   projectDetail: true,
   people: true,
   personDetail: true,
+};
+
+/** The tabs the bottom bar can land on — used to remember where the hamburger
+ *  was opened from, so Back and the lit tab both point home. */
+const MAIN_VIEWS: Partial<Record<View, true>> = {
+  today: true,
+  notes: true,
+  calendar: true,
+  focus: true,
+  projects: true,
 };
 
 const TITLES: Record<View, string> = {
@@ -60,6 +70,7 @@ export function App() {
   // Selection lives independently of the width flag, so folding and unfolding
   // mid-use never resets which project or person is open (§1.1).
   const [view, setView] = useState<View>('today');
+  const [prevMainView, setPrevMainView] = useState<View>('today');
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activePersonId, setActivePersonId] = useState<string | null>(null);
   const [radialOpen, setRadialOpen] = useState(false);
@@ -86,6 +97,7 @@ export function App() {
 
   const go = (v: View) => {
     setView(v);
+    if (MAIN_VIEWS[v]) setPrevMainView(v);
     setActiveProjectId(null);
     setActivePersonId(null);
     setRadialOpen(false);
@@ -125,10 +137,28 @@ export function App() {
   const isProjectPane = view === 'projects' || view === 'projectDetail';
   const isPeoplePane = view === 'people' || view === 'personDetail';
   const twoPane = wide && Boolean(TWO_PANE[view]);
-  const showBack = !wide && (view === 'projectDetail' || view === 'personDetail');
   // Focus is the one full-bleed page — it replaces the cream chrome entirely,
   // keeping only the bottom nav.
   const isFocus = view === 'focus';
+
+  /**
+   * Nothing under the hamburger has a tab of its own any more, so each of those
+   * pages carries its own way back: out to the menu, and from the menu out to
+   * whichever tab you opened it from.
+   */
+  const back: View | null =
+    view === 'more'
+      ? prevMainView
+      : view === 'personDetail'
+        ? 'people'
+        : view === 'projectDetail'
+          ? 'projects'
+          : MAIN_VIEWS[view]
+            ? null
+            : 'more';
+  // Unfolded, the detail pane sits beside its list — there's nothing to go back to.
+  const showBack =
+    back !== null && !(wide && (view === 'projectDetail' || view === 'personDetail'));
 
   const activeProject = store.projects.find((p) => p.id === activeProjectId);
   const activePerson = store.people.find((p) => p.id === activePersonId);
@@ -185,9 +215,56 @@ export function App() {
               background: 'linear-gradient(#f4f1e9 76%, rgba(244,241,233,0))',
             }}
           >
-            {showBack && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 4,
+              }}
+            >
+              {/* A page with its own way back doesn't also offer the menu —
+                  one backwards affordance per screen. */}
+              {showBack ? (
+                <span />
+              ) : (
+                <button
+                  onClick={() => go('more')}
+                  title="Menu"
+                  aria-label="Menu"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 6,
+                    margin: '0 0 0 -6px',
+                    color: C.ink,
+                    display: 'flex',
+                  }}
+                >
+                  <HamburgerIcon />
+                </button>
+              )}
               <button
-                onClick={() => go(view === 'projectDetail' ? 'projects' : 'people')}
+                onClick={() => setSearchOpen(true)}
+                title="Search"
+                aria-label="Search"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 6,
+                  margin: '0 -6px 0 0',
+                  color: C.softInk,
+                  display: 'flex',
+                }}
+              >
+                <SearchIcon />
+              </button>
+            </div>
+            {showBack && back && (
+              <button
+                onClick={() => go(back)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -202,7 +279,7 @@ export function App() {
                   padding: '0 0 6px',
                 }}
               >
-                ‹ {view === 'projectDetail' ? 'Projects' : 'People'}
+                ‹ {TITLES[back]}
               </button>
             )}
             {view === 'today' && (
@@ -230,24 +307,6 @@ export function App() {
             >
               {headerTitle}
             </div>
-            <button
-              onClick={() => setSearchOpen(true)}
-              title="Search"
-              aria-label="Search"
-              style={{
-                position: 'absolute',
-                top: 16,
-                right: 18,
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: 7,
-                color: C.softInk,
-                display: 'flex',
-              }}
-            >
-              <SearchIcon />
-            </button>
           </header>
 
           <main
@@ -296,7 +355,7 @@ export function App() {
         />
       )}
 
-      <BottomNav view={view} wide={wide} onGo={go} />
+      <BottomNav view={view} fallback={prevMainView} wide={wide} onGo={go} />
 
       {sheet && (
         <Sheet

@@ -75,10 +75,18 @@ export function Focus({
     <div
       style={{
         position: 'fixed',
-        inset: 0,
+        top: 0,
+        bottom: 0,
         zIndex: 10,
-        maxWidth: wide ? WIDE_MAX : NARROW_MAX,
-        margin: '0 auto',
+        // Unfolded, it sits over the same 460px column as the bottom nav, so
+        // ring and nav read as one panel rather than drifting apart.
+        ...(wide
+          ? {
+              width: NARROW_MAX,
+              right: `calc(max(0px, (100% - ${WIDE_MAX}px)/2))`,
+              left: 'auto',
+            }
+          : { left: 0, right: 0, maxWidth: NARROW_MAX, margin: '0 auto' }),
         overflow: 'hidden',
         backgroundImage: `url(${BG})`,
         backgroundSize: 'cover',
