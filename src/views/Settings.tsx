@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { clearAll } from '../db';
 import { shortDate } from '../lib/dates';
 import { canWrite } from '../lib/googleAuth';
+import { PencilIcon } from '../components/ui';
 import {
   dataSummary,
   downloadBackup,
@@ -26,6 +27,7 @@ import { Lock } from './Lock';
 export function Settings({ lock }: { lock: LockState }) {
   const store = useStore();
   const [nameDraft, setNameDraft] = useState(lock.name);
+  const [editingName, setEditingName] = useState(false);
   const [pinSheet, setPinSheet] = useState(false);
   const [confirmRemovePin, setConfirmRemovePin] = useState(false);
   const [idle, setIdle] = useState(DEFAULT_IDLE_MINUTES);
@@ -93,21 +95,59 @@ export function Settings({ lock }: { lock: LockState }) {
   return (
     <div style={{ animation: 'sbfade .3s ease', marginTop: 6 }}>
       <div style={{ ...h, marginTop: 6 }}>You</div>
+      {/* Reads as text with a pencil beside it, the same as a project's
+          description — an input parked on screen implies unsaved work. */}
       <div style={panel}>
-        <label style={label}>Your name</label>
-        <input
-          value={nameDraft}
-          onChange={(e) => setNameDraft(e.target.value)}
-          onBlur={async () => {
-            await setName(nameDraft);
-            await lock.refresh();
-          }}
-          placeholder="Your name"
-          style={input}
-        />
-        <p style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>
-          Used in the greeting at the top of Today.
-        </p>
+        {editingName ? (
+          <input
+            autoFocus
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+              if (e.key === 'Escape') {
+                setNameDraft(lock.name);
+                setEditingName(false);
+              }
+            }}
+            onBlur={async () => {
+              setEditingName(false);
+              await setName(nameDraft);
+              await lock.refresh();
+            }}
+            placeholder="Your name"
+            style={input}
+          />
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span
+              style={{
+                flex: 1,
+                minWidth: 0,
+                fontSize: 15,
+                fontWeight: 600,
+                color: lock.name ? C.ink : C.muted,
+              }}
+            >
+              {lock.name || 'Add your name…'}
+            </span>
+            <button
+              onClick={() => setEditingName(true)}
+              aria-label="Edit your name"
+              title="Edit your name"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 5,
+                cursor: 'pointer',
+                display: 'flex',
+                lineHeight: 0,
+              }}
+            >
+              <PencilIcon />
+            </button>
+          </div>
+        )}
       </div>
 
       <div style={h}>Lock</div>
