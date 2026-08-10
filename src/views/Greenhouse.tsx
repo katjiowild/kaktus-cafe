@@ -57,8 +57,14 @@ export function Greenhouse({ openProject, openSheet, openSearch, go }: ViewProps
 
   const empty = TABS.find((t) => t.status === tab)!.empty;
 
+  // The entry fade goes on the content, never on an ancestor of the background.
+  // sbfade animates a transform, and a transformed element becomes the
+  // containing block for position:fixed inside it — so for those 300ms the
+  // photo was sized to the full scroll height rather than the viewport, then
+  // snapped to a different crop the moment the transform cleared. It read as
+  // the background flicking between two different images.
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', animation: 'sbfade .3s ease' }}>
+    <div style={{ position: 'relative', minHeight: '100vh' }}>
       {/* Fixed rather than scrolling with the content: the glasshouse is a room
           you're standing in, and a photo that slides away as you scroll a long
           list reads as wallpaper instead. Held to the app's own column width so
@@ -85,6 +91,7 @@ export function Greenhouse({ openProject, openSheet, openSearch, go }: ViewProps
           maxWidth: NARROW_MAX,
           margin: '0 auto',
           padding: '18px 16px 128px',
+          animation: 'sbfade .3s ease',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
