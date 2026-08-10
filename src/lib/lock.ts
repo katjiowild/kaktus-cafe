@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSetting, isEmpty, setSetting } from '../db';
+import { biometricAvailable, biometricEnabled } from './biometric';
 
 /**
  * The app lock.
@@ -136,6 +137,10 @@ export interface LockState {
   name: string;
   /** True on a fresh install that hasn't been through the first-run flow. */
   needsOnboarding: boolean;
+  /** This device has a fingerprint reader or face unlock available. */
+  biometricPossible: boolean;
+  /** She's registered it — offer it on the lock screen. */
+  biometricOn: boolean;
   unlock: () => void;
   /** Saves the name mid-flow. Does not end onboarding — the PIN step follows. */
   chooseName: (name: string) => Promise<void>;
@@ -152,16 +157,24 @@ export function useLock(): LockState {
   const [pinSet, setPinSet] = useState(false);
   const [name, setNameState] = useState('');
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [biometricPossible, setBiometricPossible] = useState(false);
+  const [biometricOn, setBiometricOn] = useState(false);
 
   // Read inside the visibility handler rather than closed over, so changing the
   // setting takes effect without re-registering the listener.
   const idleRef = useRef(DEFAULT_IDLE_MINUTES);
 
   const refresh = useCallback(async () => {
-    const [pin, idle, savedName] = await Promise.all([hasPin(), getIdleMinutes(), getName()]);
+    const [pin, idle, savedName, bioOn] = await Promise.all([
+      hasPin(),
+      getIdleMinutes(),
+      getName(),
+      biometricEnabled(),
+    ]);
     idleRef.current = idle;
     setPinSet(pin);
     setNameState(savedName);
+    setBiometricOn(bioOn);
   }, []);
 
   useEffect(() => {
@@ -178,6 +191,8 @@ export function useLock(): LockState {
       // A fresh install is one with no name and nothing in it. Anything else
       // has been used before and shouldn't be sent through onboarding.
       setNeedsOnboarding(!savedName && (await isEmpty()));
+      setBiometricPossible(await biometricAvailable());
+      setBiometricOn(await biometricEnabled());
 
       // Cold start counts as a return: the elapsed check is the same whether
       // the app was backgrounded or discarded outright. Never lock where the
@@ -241,6 +256,8 @@ export function useLock(): LockState {
     pinSet,
     name,
     needsOnboarding,
+    biometricPossible,
+    biometricOn,
     unlock,
     chooseName,
     completeOnboarding,

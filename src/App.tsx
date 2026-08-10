@@ -413,6 +413,7 @@ export function App() {
               lock.unlock();
             }
           }}
+          biometricOn={lock.biometricOn}
           onNameChosen={lock.chooseName}
         />
       )}

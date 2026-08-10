@@ -4,7 +4,7 @@ import { useStore } from '../store';
 import { clearAll } from '../db';
 import { shortDate } from '../lib/dates';
 import { canWrite } from '../lib/googleAuth';
-import { PencilIcon } from '../components/ui';
+import { FingerprintIcon, PencilIcon, ToggleRow } from '../components/ui';
 import {
   dataSummary,
   downloadBackup,
@@ -22,6 +22,7 @@ import {
   setName,
   type LockState,
 } from '../lib/lock';
+import { disableBiometric, enableBiometric } from '../lib/biometric';
 import { Lock } from './Lock';
 
 export function Settings({ lock }: { lock: LockState }) {
@@ -164,6 +165,37 @@ export function Settings({ lock }: { lock: LockState }) {
                 Change PIN
               </button>
             </div>
+            {/* Only where a PIN already exists: this is a shortcut past the
+                keypad, never a replacement for it. */}
+            {lock.biometricPossible && (
+              <div style={{ marginTop: 14 }}>
+                <ToggleRow
+                  icon={<FingerprintIcon />}
+                  label="Unlock with fingerprint"
+                  on={lock.biometricOn}
+                  onToggle={async () => {
+                    if (lock.biometricOn) {
+                      await disableBiometric();
+                      await lock.refresh();
+                      return;
+                    }
+                    try {
+                      const ok = await enableBiometric(lock.name);
+                      await lock.refresh();
+                      if (ok) store.showToast('Fingerprint unlock on');
+                    } catch {
+                      // Backing out of the platform's own prompt isn't a fault.
+                      store.showToast("Didn't set that up — your PIN still works");
+                    }
+                  }}
+                />
+                <p style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>
+                  A shortcut past the keypad. Your PIN keeps working, and is the
+                  way in if the reader doesn't cooperate.
+                </p>
+              </div>
+            )}
+
             <label style={{ ...label, marginTop: 16 }}>Ask for it again</label>
             <select
               value={idle}
@@ -208,7 +240,10 @@ export function Settings({ lock }: { lock: LockState }) {
               <div style={{ display: 'flex', gap: 9, marginTop: 9 }}>
                 <button
                   onClick={async () => {
-                    await clearPin();
+                    // The fingerprint was a shortcut past the PIN; with no PIN
+                    // there's nothing to shortcut, and a stale credential
+                    // shouldn't sit in storage.
+                    await Promise.all([clearPin(), disableBiometric()]);
                     await lock.refresh();
                     setConfirmRemovePin(false);
                   }}
