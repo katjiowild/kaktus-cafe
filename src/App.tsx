@@ -21,11 +21,14 @@ import { Lock } from './views/Lock';
 import type { View, ViewProps } from './views/types';
 
 /**
- * Two-pane master–detail when unfolded (owner-confirmed: People, Calendar).
- * The Greenhouse is deliberately not in here: it's a full-bleed photographic
- * page, so it fills the canvas and the project opens over it.
+ * Two-pane master–detail when unfolded. The Greenhouse is in here: unfolded,
+ * the glasshouse becomes a column of plants on the left with the project you
+ * picked open beside it, and the photograph stays inside that column rather
+ * than running under the detail pane.
  */
 const TWO_PANE: Partial<Record<View, true>> = {
+  garden: true,
+  projectDetail: true,
   people: true,
   personDetail: true,
 };
@@ -153,12 +156,16 @@ export function App() {
   );
 
   const isPeoplePane = view === 'people' || view === 'personDetail';
+  const isGardenPane = view === 'garden' || view === 'projectDetail';
   const twoPane = wide && Boolean(TWO_PANE[view]);
-  // Focus and the Greenhouse are the full-bleed pages — each replaces the
-  // cream chrome entirely and carries its own header, keeping only the bottom
-  // nav. Focus goes further and drops that too.
   const isFocus = view === 'focus';
-  const isGreenhouse = view === 'garden';
+  /**
+   * Folded, the Greenhouse is full-bleed like Focus: it replaces the cream
+   * chrome and carries its own header. Unfolded it becomes the left pane of a
+   * master–detail instead, and hands the header back to the app chrome —
+   * otherwise the page would carry two titles and two search buttons.
+   */
+  const isGreenhouse = view === 'garden' && !wide;
   const chromeless = isFocus || isGreenhouse;
 
   /**
@@ -185,7 +192,13 @@ export function App() {
   // so the chrome only supplies the back chevron above it.
   const headerTitle =
     view === 'projectDetail'
-      ? ''
+      ? // Unfolded, the Greenhouse is still on screen beside the project, so
+        // the header keeps naming it. Folded, the project's own header row —
+        // thumbnail, name, status pill — is the title, and the chrome above it
+        // stays empty.
+        wide
+        ? 'Greenhouse'
+        : ''
       : view === 'personDetail'
         ? (activePerson?.name ?? 'Person')
         : // Today carries the greeting above it, so the headline can be the
@@ -349,9 +362,10 @@ export function App() {
             {view === 'more' && <More {...props} />}
             {view === 'settings' && <Settings lock={lock} />}
             {view === 'system' && <VisualSystem />}
-            {view === 'projectDetail' && <ProjectDetail {...props} />}
 
             {/* Two-pane: the list stays put and the detail fills the right pane. */}
+            {isGardenPane && wide && <Greenhouse {...props} />}
+            {isGardenPane && (wide || view === 'projectDetail') && <ProjectDetail {...props} />}
             {isPeoplePane && (wide || view === 'people') && <People {...props} />}
             {isPeoplePane && (wide || view === 'personDetail') && <PersonDetail {...props} />}
           </main>
@@ -367,6 +381,7 @@ export function App() {
         </>
       )}
 
+      {/* Folded only — unfolded, it renders as a pane inside main above. */}
       {isGreenhouse && <Greenhouse {...props} />}
 
       {isFocus && (
@@ -379,10 +394,7 @@ export function App() {
         />
       )}
 
-      {/* Unfolded, the bar flushes right to sit under a two-pane detail view.
-          The full-bleed pages are a single centred column, so there it centres
-          with them instead of drifting off to one side. */}
-      <BottomNav view={view} fallback={prevMainView} wide={wide && !chromeless} onGo={go} />
+      <BottomNav view={view} fallback={prevMainView} onGo={go} />
 
       {sheet && (
         <Sheet

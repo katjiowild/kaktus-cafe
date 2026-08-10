@@ -32,16 +32,18 @@ const GROUP: Partial<Record<View, View>> = {
 export function BottomNav({
   view,
   fallback,
-  wide,
   onGo,
 }: {
   view: View;
   /** The tab to keep lit while a menu page is open. */
   fallback: View;
-  wide: boolean;
   onGo: (v: View) => void;
 }) {
-  const base: React.CSSProperties = {
+  // Centred at every width. It used to flush right when unfolded, to sit under
+  // the detail pane — but that put the bar in a different place depending on
+  // which tab you were on, and the tabs are the one thing that should never
+  // move.
+  const style: React.CSSProperties = {
     position: 'fixed',
     bottom: 0,
     zIndex: 30,
@@ -51,12 +53,11 @@ export function BottomNav({
     display: 'flex',
     padding: '8px 6px 10px',
     paddingBottom: 'calc(10px + env(safe-area-inset-bottom))',
+    left: 0,
+    right: 0,
+    maxWidth: NARROW_MAX,
+    margin: '0 auto',
   };
-  // Wide: the bar flushes to the right edge of the 900px canvas, aligned to the
-  // detail pane, rather than stretching across it.
-  const style: React.CSSProperties = wide
-    ? { ...base, width: NARROW_MAX, right: `calc(max(0px, (100% - ${WIDE_MAX}px)/2))`, left: 'auto' }
-    : { ...base, left: 0, right: 0, maxWidth: NARROW_MAX, margin: '0 auto' };
 
   const active = GROUP[view] ?? fallback;
 

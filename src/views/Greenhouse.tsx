@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { C, NARROW_MAX, SERIF } from '../tokens';
+import { C, CARD_SHADOW_LG, NARROW_MAX, SERIF } from '../tokens';
 import { useStore } from '../store';
 import { projectMeta, type ProjectMeta } from '../lib/derive';
 import { Plant } from '../components/Plant';
@@ -39,7 +39,7 @@ const TILE =
     ? { art: 94, plant: 84, name: 13.5, meta: 11, pct: 17, pad: '8px 9px 10px' }
     : { art: 124, plant: 112, name: 15.5, meta: 12, pct: 21, pad: '11px 12px 13px' };
 
-export function Greenhouse({ openProject, openSheet, openSearch, go }: ViewProps) {
+export function Greenhouse({ wide, openProject, openSheet, openSearch, go }: ViewProps) {
   const { projects, tasks, notes, dismissed } = useStore();
   const [tab, setTab] = useState<ProjectStatus>('active');
 
@@ -64,58 +64,93 @@ export function Greenhouse({ openProject, openSheet, openSearch, go }: ViewProps
   // snapped to a different crop the moment the transform cleared. It read as
   // the background flicking between two different images.
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
-      {/* Fixed rather than scrolling with the content: the glasshouse is a room
-          you're standing in, and a photo that slides away as you scroll a long
-          list reads as wallpaper instead. Held to the app's own column width so
-          it doesn't span the whole window on a desktop. */}
-      <div
-        aria-hidden
-        style={{
-          position: 'fixed',
-          top: 0,
-          bottom: 0,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '100%',
-          maxWidth: NARROW_MAX,
-          backgroundImage: `url(${import.meta.env.BASE_URL}garden/bg-greenhouse.jpg)`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      />
+    <div
+      style={
+        wide
+          ? // Unfolded: a column of plants beside the open project, scrolling
+            // on its own. Sticky alone wasn't enough — the column is taller
+            // than the screen, so a sticky pane pins its top and puts its last
+            // row permanently out of reach.
+            //
+            // The photo goes on the pane itself rather than in a child layer:
+            // a background belongs to the border box, so it stays put while
+            // the plants scroll over it, and it stops at the pane's edge
+            // instead of running under the project beside it.
+            {
+              position: 'sticky',
+              top: 4,
+              alignSelf: 'flex-start',
+              flex: '0 0 42%',
+              maxWidth: '42%',
+              maxHeight: 'calc(100vh - 150px)',
+              overflowY: 'auto',
+              borderRadius: 18,
+              boxShadow: CARD_SHADOW_LG,
+              backgroundImage: `url(${import.meta.env.BASE_URL}garden/bg-greenhouse.jpg)`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }
+          : { position: 'relative', minHeight: '100vh' }
+      }
+    >
+      {/* Folded, the photo is fixed to the viewport rather than scrolling with
+          the content: the glasshouse is a room you're standing in, and a photo
+          that slides away down a long list reads as wallpaper instead. */}
+      {!wide && (
+        <div
+          aria-hidden
+          style={{
+            position: 'fixed',
+            top: 0,
+            bottom: 0,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '100%',
+            maxWidth: NARROW_MAX,
+            backgroundImage: `url(${import.meta.env.BASE_URL}garden/bg-greenhouse.jpg)`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        />
+      )}
 
       <div
         style={{
           position: 'relative',
-          maxWidth: NARROW_MAX,
+          maxWidth: wide ? undefined : NARROW_MAX,
           margin: '0 auto',
-          padding: '18px 16px 128px',
+          padding: wide ? '14px 14px 18px' : '18px 16px 128px',
           animation: 'sbfade .3s ease',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-          <GlassButton label="Menu" onClick={() => go('more')}>
-            <HamburgerIcon size={20} />
-          </GlassButton>
-          <GlassButton label="Search" onClick={openSearch}>
-            <SearchIcon size={19} />
-          </GlassButton>
-        </div>
+        {/* In a pane the app chrome supplies the title, menu and search — two
+            of each on one screen would be a mess. */}
+        {!wide && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <GlassButton label="Menu" onClick={() => go('more')}>
+                <HamburgerIcon size={20} />
+              </GlassButton>
+              <GlassButton label="Search" onClick={openSearch}>
+                <SearchIcon size={19} />
+              </GlassButton>
+            </div>
 
-        <h1
-          style={{
-            fontFamily: SERIF,
-            fontSize: 40,
-            fontWeight: 500,
-            color: '#fff',
-            letterSpacing: '-.02em',
-            margin: '14px 0 20px',
-            textShadow: '0 2px 18px rgba(20,32,25,.5)',
-          }}
-        >
-          Greenhouse
-        </h1>
+            <h1
+              style={{
+                fontFamily: SERIF,
+                fontSize: 40,
+                fontWeight: 500,
+                color: '#fff',
+                letterSpacing: '-.02em',
+                margin: '14px 0 20px',
+                textShadow: '0 2px 18px rgba(20,32,25,.5)',
+              }}
+            >
+              Greenhouse
+            </h1>
+          </>
+        )}
 
         <div
           role="tablist"
