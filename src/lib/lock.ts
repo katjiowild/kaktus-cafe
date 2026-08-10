@@ -16,6 +16,15 @@ import { getSetting, isEmpty, setSetting } from '../db';
 
 const ITERATIONS = 210_000;
 
+/**
+ * WebCrypto only exists in a secure context — https, or localhost. Served over
+ * plain http (a phone pointed at a dev server on the LAN, say) `crypto.subtle`
+ * is undefined and hashing throws. Rather than let that surface as a dead
+ * keypad, the lock is offered only where it can actually work.
+ */
+export const CAN_LOCK =
+  typeof crypto !== 'undefined' && typeof crypto.subtle !== 'undefined';
+
 interface StoredPin {
   salt: string;
   hash: string;
@@ -171,8 +180,9 @@ export function useLock(): LockState {
       setNeedsOnboarding(!savedName && (await isEmpty()));
 
       // Cold start counts as a return: the elapsed check is the same whether
-      // the app was backgrounded or discarded outright.
-      if (pin && idle >= 0) {
+      // the app was backgrounded or discarded outright. Never lock where the
+      // PIN couldn't be checked — that would be a door with no key.
+      if (pin && idle >= 0 && CAN_LOCK) {
         const idleMs = idle * 60_000;
         setLocked(Date.now() - lastActive > idleMs);
       }

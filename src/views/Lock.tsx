@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { C, SERIF } from '../tokens';
-import { setPin, verifyPin } from '../lib/lock';
+import { CAN_LOCK, setPin, verifyPin } from '../lib/lock';
 
 const BG = `${import.meta.env.BASE_URL}lock/bg-lock.jpg`;
 const LOGO = `${import.meta.env.BASE_URL}lock/logo.png`;
@@ -123,27 +123,35 @@ export function Lock({
     busy.current = true;
     const id = window.setTimeout(() => {
       void (async () => {
-        if (stage === 'set') {
-          setFirst(draft);
-          setDraft('');
-          setError('');
-          setStage('confirm');
-        } else if (stage === 'confirm') {
-          if (draft === first) {
-            await setPin(draft);
-            onUnlocked();
-          } else {
-            // The prototype said "Incorrect PIN" here, which is the wrong
-            // sentence for two entries that simply didn't match.
-            setFirst('');
-            setStage('set');
-            fail("Those didn't match — start again");
+        try {
+          if (stage === 'set') {
+            setFirst(draft);
+            setDraft('');
+            setError('');
+            setStage('confirm');
+          } else if (stage === 'confirm') {
+            if (draft === first) {
+              await setPin(draft);
+              onUnlocked();
+            } else {
+              // The prototype said "Incorrect PIN" here, which is the wrong
+              // sentence for two entries that simply didn't match.
+              setFirst('');
+              setStage('set');
+              fail("Those didn't match — start again");
+            }
+          } else if (stage === 'enter') {
+            if (await verifyPin(draft)) onUnlocked();
+            else fail('Incorrect PIN — try again');
           }
-        } else if (stage === 'enter') {
-          if (await verifyPin(draft)) onUnlocked();
-          else fail('Incorrect PIN — try again');
+        } catch (e) {
+          // Hashing is the only thing here that can throw. Whatever the cause,
+          // say something — an unresponsive keypad is the worst answer.
+          fail(e instanceof Error ? `Couldn't save that — ${e.message}` : "Something went wrong");
+        } finally {
+          // Always, or one failure wedges the keypad for good.
+          busy.current = false;
         }
-        busy.current = false;
       })();
     }, SETTLE_MS);
     return () => {
@@ -162,7 +170,10 @@ export function Lock({
   const titles: Record<Stage, { title: string; sub: string }> = {
     welcome: { title: 'Kaktus Cafe', sub: 'A quiet place for your work to grow.' },
     name: { title: 'What should I call you?', sub: 'It only shows up in your greeting.' },
-    set: { title: 'Set your PIN', sub: 'Choose a 4-digit PIN to lock the app.' },
+    set: {
+      title: CAN_LOCK ? 'Set your PIN' : 'One last thing',
+      sub: CAN_LOCK ? 'Choose a 4-digit PIN to lock the app.' : '',
+    },
     confirm: { title: 'Confirm your PIN', sub: 'Enter it once more to confirm.' },
     enter: {
       title: 'Welcome back',
@@ -327,7 +338,44 @@ export function Lock({
             </>
           )}
 
-          {(stage === 'set' || stage === 'confirm' || stage === 'enter') && (
+          {/* No WebCrypto here, so no PIN can be hashed. Say so and move on
+              rather than presenting a keypad that can't work. */}
+          {(stage === 'set' || stage === 'confirm') && !CAN_LOCK && (
+            <>
+              <div
+                style={{
+                  maxWidth: 290,
+                  color: '#e8dbb4',
+                  fontSize: 13.5,
+                  lineHeight: 1.55,
+                  marginBottom: 20,
+                }}
+              >
+                A PIN can't be set on this address. Locking needs a secure
+                connection — open the app over https and it'll be available in
+                Settings.
+              </div>
+              <button
+                onClick={onUnlocked}
+                style={{
+                  width: 250,
+                  background: '#1b3f2d',
+                  color: '#fff',
+                  border: '1px solid rgba(255,255,255,.4)',
+                  borderRadius: 14,
+                  padding: 15,
+                  fontFamily: 'inherit',
+                  fontSize: 16,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Continue
+              </button>
+            </>
+          )}
+
+          {(stage === 'enter' || ((stage === 'set' || stage === 'confirm') && CAN_LOCK)) && (
             <>
               <Dots filled={draft.length} />
               {error && (

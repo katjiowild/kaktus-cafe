@@ -12,6 +12,7 @@ import {
   importContacts,
 } from '../lib/backup';
 import {
+  CAN_LOCK,
   clearPin,
   DEFAULT_IDLE_MINUTES,
   getIdleMinutes,
@@ -224,7 +225,7 @@ export function Settings({ lock }: { lock: LockState }) {
               </button>
             )}
           </>
-        ) : (
+        ) : CAN_LOCK ? (
           <>
             <button
               onClick={() => setPinSheet(true)}
@@ -236,6 +237,11 @@ export function Settings({ lock }: { lock: LockState }) {
               There's no way to reset a forgotten PIN — export a backup first.
             </p>
           </>
+        ) : (
+          <p style={{ fontSize: 12.5, color: C.muted, marginTop: 12 }}>
+            Not available on this address — locking needs a secure connection.
+            Open the app over https and it'll appear here.
+          </p>
         )}
       </div>
 
