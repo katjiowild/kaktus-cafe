@@ -4,6 +4,14 @@
 // each carries its own id, so they lift cleanly into child tables with a parent
 // foreign key when that day comes.
 
+import type { PlantSpecies } from './lib/species';
+
+/**
+ * Type is a label and a scheduling hint — it decides which fields the form
+ * shows (dates for active, cadence for retainer) and which accent the card
+ * carries. It no longer decides how a project grows or what it looks like:
+ * growth is task count for everything, and the plant is picked by hand.
+ */
 export type ProjectType = 'active' | 'retainer' | 'area';
 
 /** Spec §3.1. `done` projects live in the Archive; `onhold` is parked but not finished. */
@@ -34,7 +42,10 @@ export interface Project {
   lastActivityDate: string;
   /** ISO date, set when status becomes 'done'. */
   completedOn: string | null;
-  /** Featured on the Garden page. At most GARDEN_SLOTS projects at a time. */
+  /** Which succulent stands for this project. Chosen, never derived. */
+  species: PlantSpecies;
+  /** Floats to the top of its Greenhouse tab. Capped at GARDEN_SLOTS, because
+   *  these are also the projects the Garden page will feature. */
   pinned: boolean;
   milestones: Milestone[];
   createdAt: string;

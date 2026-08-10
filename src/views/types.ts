@@ -1,6 +1,6 @@
 export type View =
   | 'today'
-  | 'projects'
+  | 'garden'
   | 'projectDetail'
   | 'calendar'
   | 'notes'
@@ -10,7 +10,6 @@ export type View =
   | 'meetings'
   | 'people'
   | 'personDetail'
-  | 'archive'
   | 'settings'
   | 'system';
 
@@ -23,6 +22,9 @@ export interface ViewProps {
   openProject: (id: string) => void;
   openPerson: (id: string) => void;
   openSheet: (s: SheetState) => void;
+  /** Full-bleed pages carry their own header, so they open search themselves
+   *  rather than through the app chrome. */
+  openSearch: () => void;
   activeProjectId: string | null;
   activePersonId: string | null;
   /** Today's intention — written on Today's focus card, read on the Focus page. */

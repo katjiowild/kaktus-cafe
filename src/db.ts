@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { Meeting, Note, Person, Project, Setting, Task } from './types';
+import { DEFAULT_SPECIES, type PlantSpecies } from './lib/species';
 
 /**
  * IndexedDB via Dexie. One table per record type — the same shape a v2 backend
@@ -214,10 +215,32 @@ class KaktusDB extends Dexie {
           delete (p as Project & { comments?: unknown }).comments;
         });
       });
+
+    // v11 — Project.species. Type used to pick the plant, so backfilling from
+    // type means nothing changes appearance on upgrade: every project keeps
+    // the succulent it was already showing, and picking a different one is
+    // now a deliberate act. Areas drew a dracaena that no longer exists as
+    // art, so they take the agave — the closest thing in the set.
+    this.version(11)
+      .stores({})
+      .upgrade(async (tx) => {
+        const BY_TYPE: Record<string, PlantSpecies> = {
+          active: 'echeveria',
+          retainer: 'aeonium',
+          area: 'agave',
+        };
+        await tx
+          .table<Project>('projects')
+          .toCollection()
+          .modify((p) => {
+            if (!p.species) p.species = BY_TYPE[p.type] ?? DEFAULT_SPECIES;
+          });
+      });
   }
 }
 
-/** How many projects the Garden can show at once. */
+/** How many projects can be pinned to the top of the Greenhouse — and, later,
+ *  featured on the Garden page. */
 export const GARDEN_SLOTS = 7;
 
 export const db = new KaktusDB();

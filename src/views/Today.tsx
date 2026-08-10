@@ -173,7 +173,7 @@ export function Today({
           }}
         >
           <div style={{ flexShrink: 0, marginTop: 1 }}>
-            <Plant stage={meta.stage} vitality={meta.vitality} species={project.type} size={44} />
+            <Plant stage={meta.stage} vitality={meta.vitality} species={project.species} size={44} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div

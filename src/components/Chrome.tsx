@@ -6,15 +6,16 @@ import type { View } from '../views/types';
  * The five bottom-nav items, in the Phase 2 design's order. More has given up
  * its slot to Focus and now lives behind the header's hamburger.
  *
- * Projects sits where the design puts Garden — it becomes Garden in the next
- * phase, so nothing moves again when that lands.
+ * Garden takes the slot Projects used to hold. For now the tab opens the
+ * Greenhouse directly — the Garden page it will eventually sit behind isn't
+ * built yet, which is also why the Greenhouse has no back chevron.
  */
 const NAV: { view: View; label: string; icon: string }[] = [
   { view: 'today', label: 'Today', icon: 'today' },
   { view: 'notes', label: 'Notes', icon: 'notes' },
   { view: 'calendar', label: 'Calendar', icon: 'calendar' },
   { view: 'focus', label: 'Focus', icon: 'focus' },
-  { view: 'projects', label: 'Projects', icon: 'projects' },
+  { view: 'garden', label: 'Garden', icon: 'garden' },
 ];
 
 /** Which nav item lights up. Views the menu owns aren't listed — they keep the
@@ -24,8 +25,8 @@ const GROUP: Partial<Record<View, View>> = {
   notes: 'notes',
   calendar: 'calendar',
   focus: 'focus',
-  projects: 'projects',
-  projectDetail: 'projects',
+  garden: 'garden',
+  projectDetail: 'garden',
 };
 
 export function BottomNav({

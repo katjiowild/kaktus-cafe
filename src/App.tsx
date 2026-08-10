@@ -6,24 +6,26 @@ import { Sheet, type SheetState } from './components/Sheet';
 import { HamburgerIcon, SearchIcon, Toast } from './components/ui';
 import { Search } from './components/Search';
 import { Today } from './views/Today';
-import { Projects } from './views/Projects';
+import { Greenhouse } from './views/Greenhouse';
 import { ProjectDetail } from './views/ProjectDetail';
 import { Tasks } from './views/Tasks';
 import { Notes } from './views/Notes';
 import { Calendar } from './views/Calendar';
 import { Focus } from './views/Focus';
 import { People, PersonDetail } from './views/People';
-import { Archive, Meetings, More, VisualSystem } from './views/Misc';
+import { Meetings, More, VisualSystem } from './views/Misc';
 import { Settings } from './views/Settings';
 import { useFocusTimer } from './lib/focus';
 import { useLock } from './lib/lock';
 import { Lock } from './views/Lock';
 import type { View, ViewProps } from './views/types';
 
-/** Two-pane master–detail when unfolded (owner-confirmed: Projects, People, Calendar). */
+/**
+ * Two-pane master–detail when unfolded (owner-confirmed: People, Calendar).
+ * The Greenhouse is deliberately not in here: it's a full-bleed photographic
+ * page, so it fills the canvas and the project opens over it.
+ */
 const TWO_PANE: Partial<Record<View, true>> = {
-  projects: true,
-  projectDetail: true,
   people: true,
   personDetail: true,
 };
@@ -35,13 +37,13 @@ const MAIN_VIEWS: Partial<Record<View, true>> = {
   notes: true,
   calendar: true,
   focus: true,
-  projects: true,
+  garden: true,
 };
 
 /** Short names — the header shows these, and the back chevron reuses them. */
 const TITLES: Record<View, string> = {
   today: 'Today',
-  projects: 'Projects',
+  garden: 'Greenhouse',
   projectDetail: 'Project',
   calendar: 'Calendar',
   notes: 'Notes',
@@ -51,7 +53,6 @@ const TITLES: Record<View, string> = {
   meetings: 'Meetings',
   people: 'People',
   personDetail: 'Person',
-  archive: 'Archive',
   settings: 'Settings',
   system: 'Visual system',
 };
@@ -141,6 +142,7 @@ export function App() {
       openProject,
       openPerson,
       openSheet,
+      openSearch: () => setSearchOpen(true),
       activeProjectId,
       activePersonId,
       focusIntention: focusTimer.intention,
@@ -150,12 +152,14 @@ export function App() {
     [wide, activeProjectId, activePersonId, focusTimer.intention, focusTimer.setIntention],
   );
 
-  const isProjectPane = view === 'projects' || view === 'projectDetail';
   const isPeoplePane = view === 'people' || view === 'personDetail';
   const twoPane = wide && Boolean(TWO_PANE[view]);
-  // Focus is the one full-bleed page — it replaces the cream chrome entirely,
-  // keeping only the bottom nav.
+  // Focus and the Greenhouse are the full-bleed pages — each replaces the
+  // cream chrome entirely and carries its own header, keeping only the bottom
+  // nav. Focus goes further and drops that too.
   const isFocus = view === 'focus';
+  const isGreenhouse = view === 'garden';
+  const chromeless = isFocus || isGreenhouse;
 
   /**
    * Nothing under the hamburger has a tab of its own any more, so each of those
@@ -168,7 +172,7 @@ export function App() {
       : view === 'personDetail'
         ? 'people'
         : view === 'projectDetail'
-          ? 'projects'
+          ? 'garden'
           : MAIN_VIEWS[view]
             ? null
             : 'more';
@@ -226,7 +230,7 @@ export function App() {
         boxShadow: '0 0 60px rgba(36,43,40,.12)',
       }}
     >
-      {!isFocus && (
+      {!chromeless && (
         <>
           <header
             style={{
@@ -343,13 +347,11 @@ export function App() {
             {view === 'calendar' && <Calendar {...props} />}
             {view === 'meetings' && <Meetings {...props} />}
             {view === 'more' && <More {...props} />}
-            {view === 'archive' && <Archive {...props} />}
             {view === 'settings' && <Settings lock={lock} />}
             {view === 'system' && <VisualSystem />}
+            {view === 'projectDetail' && <ProjectDetail {...props} />}
 
             {/* Two-pane: the list stays put and the detail fills the right pane. */}
-            {isProjectPane && (wide || view === 'projects') && <Projects {...props} />}
-            {isProjectPane && (wide || view === 'projectDetail') && <ProjectDetail {...props} />}
             {isPeoplePane && (wide || view === 'people') && <People {...props} />}
             {isPeoplePane && (wide || view === 'personDetail') && <PersonDetail {...props} />}
           </main>
@@ -365,6 +367,8 @@ export function App() {
         </>
       )}
 
+      {isGreenhouse && <Greenhouse {...props} />}
+
       {isFocus && (
         <Focus
           timer={focusTimer}
@@ -375,7 +379,10 @@ export function App() {
         />
       )}
 
-      <BottomNav view={view} fallback={prevMainView} wide={wide} onGo={go} />
+      {/* Unfolded, the bar flushes right to sit under a two-pane detail view.
+          The full-bleed pages are a single centred column, so there it centres
+          with them instead of drifting off to one side. */}
+      <BottomNav view={view} fallback={prevMainView} wide={wide && !chromeless} onGo={go} />
 
       {sheet && (
         <Sheet

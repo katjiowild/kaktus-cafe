@@ -3,7 +3,9 @@ import { C, dashedBtn, input, label, pill, primaryBtn, SERIF } from '../tokens';
 import { useStore, type TemplateKey } from '../store';
 import { isoDate, WEEKDAY_LETTERS } from '../lib/dates';
 import type { Cadence, ProjectType, Recurrence } from '../types';
+import { SPECIES, speciesOr, type PlantSpecies } from '../lib/species';
 import { Checkbox, FlameIcon, LocationIcon, PinIcon, ToggleRow } from './ui';
+import { Plant } from './Plant';
 import { PersonPicker } from './PersonPicker';
 import { Linkify } from './Linkify';
 import { canWrite } from '../lib/googleAuth';
@@ -601,6 +603,7 @@ function ProjectSheet({
 
   const [name, setName] = useState(existing?.name ?? '');
   const [type, setType] = useState<ProjectType>(existing?.type ?? 'active');
+  const [species, setSpecies] = useState<PlantSpecies>(speciesOr(existing?.species));
   const [template, setTemplate] = useState<TemplateKey>('blank');
   const [description, setDescription] = useState(existing?.description ?? '');
   const [startDate, setStartDate] = useState(existing?.startDate ?? isoDate());
@@ -620,6 +623,7 @@ function ProjectSheet({
     if (existing) {
       await store.updateProject(existing.id, {
         name: n,
+        species,
         description,
         startDate: existing.type === 'active' ? startDate || null : null,
         endDate: existing.type === 'active' ? endDate || null : null,
@@ -631,6 +635,7 @@ function ProjectSheet({
       const newId = await store.createProject({
         name: n,
         type,
+        species,
         template,
         description,
         startDate: type === 'active' ? startDate || null : null,
@@ -643,8 +648,9 @@ function ProjectSheet({
     onClose();
   };
 
-  // Editing never changes type — the plant species and the whole card layout
-  // hang off it, and a silent species swap would be jarring.
+  // Editing never changes type: it decides which fields this form shows, and
+  // switching an active project to a retainer mid-life would strip its dates.
+  // The plant is no longer attached to it, so that stays editable.
   const shownType = existing?.type ?? type;
 
   return (
@@ -694,6 +700,59 @@ function ProjectSheet({
           </div>
         </Field>
       )}
+
+      <Field>
+        <label style={label}>Plant</label>
+        {/* Shown at full growth: you're choosing a species, not a stage, and
+            the level-1 seedlings are hard to tell apart. */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            overflowX: 'auto',
+            paddingBottom: 4,
+            margin: '0 -2px',
+          }}
+        >
+          {SPECIES.map((s) => {
+            const on = species === s.id;
+            return (
+              <button
+                key={s.id}
+                onClick={() => setSpecies(s.id)}
+                aria-pressed={on}
+                style={{
+                  flexShrink: 0,
+                  width: 76,
+                  border: `1.5px solid ${on ? C.sage : C.line}`,
+                  background: on ? C.sageBg : C.card,
+                  borderRadius: 12,
+                  padding: '6px 4px 7px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 2,
+                }}
+              >
+                <Plant stage={4} vitality="healthy" species={s.id} size={52} />
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: on ? C.sageInk : C.muted,
+                    textAlign: 'center',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {s.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Field>
 
       <Field>
         <label style={label}>Description</label>

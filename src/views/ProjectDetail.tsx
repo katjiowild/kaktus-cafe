@@ -158,7 +158,7 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, openPerson }: 
             flexShrink: 0,
           }}
         >
-          <Plant stage={m.stage} vitality={m.vitality} species={project.type} size={56} />
+          <Plant stage={m.stage} vitality={m.vitality} species={project.species} size={56} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: SERIF, fontSize: TYPE.projectName, fontWeight: 600, lineHeight: 1.15 }}>
@@ -191,7 +191,7 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, openPerson }: 
           <span aria-hidden style={{ fontSize: 12, lineHeight: 1 }}>
             {project.pinned ? '★' : '☆'}
           </span>
-          {project.pinned ? 'In Garden' : 'Pin to Garden'}
+          {project.pinned ? 'Pinned' : 'Pin to top'}
         </button>
       </div>
 
@@ -541,9 +541,28 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, openPerson }: 
                 Resume Project
               </button>
             )}
-            {/* Done deliberately has no CTA in the brief. Restoring one stays
-                possible from the Archive, which is where completed projects
-                are managed. */}
+            {/* The Archive used to own this, and it was the only way back —
+                so with the Archive folded into the Greenhouse's Completed
+                tab, reopening has to live here or it stops existing. */}
+            {project.status === 'done' && (
+              <button
+                onClick={() => void store.reopenProject(project.id)}
+                style={{
+                  width: '100%',
+                  background: 'transparent',
+                  color: C.sage,
+                  border: `1px solid ${C.line}`,
+                  borderRadius: 13,
+                  padding: '14px',
+                  fontFamily: 'inherit',
+                  fontSize: 14.5,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Reopen Project
+              </button>
+            )}
           </div>
         </>
       )}

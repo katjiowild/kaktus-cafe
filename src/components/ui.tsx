@@ -288,6 +288,9 @@ export function Toast({ message }: { message: string }) {
 const NAV_PATHS: Record<string, string> = {
   today: 'M3 12l9-9 9 9 M5 10v10h14V10',
   projects: 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z',
+  /** A potted succulent — the Garden tab, and the only nav glyph that draws
+   *  the thing the page is full of rather than a document or a grid. */
+  garden: 'M6.5 14h11l-1.1 6H7.6z M12 14V8 M12 12c0-2.6 1.9-4.6 4.5-4.6 0 2.6-1.9 4.6-4.5 4.6z M12 12.6c0-2.6-1.9-4.6-4.5-4.6 0 2.6 1.9 4.6 4.5 4.6z',
   calendar: 'M4 5h16v16H4z M4 10h16 M8 3v4 M16 3v4',
   notes: 'M6 3h9l3 3v15H6z M14 3v4h4',
   tasks: 'M9 6h11 M9 12h11 M9 18h11 M4 6l1 1 2-2 M4 12l1 1 2-2 M4 18l1 1 2-2',

@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { db, GARDEN_SLOTS, getSetting, setSetting, uid } from './db';
 import { isoDate, isoNow, nextOccurrence, parseDate, today } from './lib/dates';
+import type { PlantSpecies } from './lib/species';
 import {
   createGoogleEvent,
   withCalendarLock,
@@ -68,6 +69,7 @@ export interface Store extends Data {
   createProject: (input: {
     name: string;
     type: ProjectType;
+    species: PlantSpecies;
     template: TemplateKey;
     description?: string;
     startDate?: string | null;
@@ -77,10 +79,10 @@ export interface Store extends Data {
   updateProject: (id: string, patch: Partial<Project>) => Promise<void>;
   completeProject: (id: string) => Promise<void>;
   /** Park a project without finishing it. Separate from `reopenProject`, which
-   *  is the Archive's restore and says so in its toast. */
+   *  brings a completed one back and says so in its toast. */
   holdProject: (id: string) => Promise<void>;
   resumeProject: (id: string) => Promise<void>;
-  /** Feature this project in the Garden, or take it out. Capped at GARDEN_SLOTS. */
+  /** Float this project to the top of its Greenhouse tab. Capped at GARDEN_SLOTS. */
   toggleProjectPin: (id: string) => Promise<void>;
   reopenProject: (id: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
@@ -287,7 +289,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       reload,
 
       // ---------- Projects ----------
-      async createProject({ name, type, template, description, startDate, endDate, cadence }) {
+      async createProject({
+        name,
+        type,
+        species,
+        template,
+        description,
+        startDate,
+        endDate,
+        cadence,
+      }) {
         const id = uid('proj');
         const now = isoNow();
         const milestones =
@@ -310,6 +321,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           cadence: type === 'retainer' ? (cadence ?? 'weekly') : null,
           lastActivityDate: now,
           completedOn: null,
+          species,
           pinned: false,
           milestones,
           createdAt: now,
@@ -383,13 +395,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           // both read a stale seven-minus-one and overfill the Garden.
           const pinnedCount = await db.projects.filter((p) => p.pinned).count();
           if (pinnedCount >= GARDEN_SLOTS) {
-            showToast('Garden is full — remove a plant first');
+            showToast(`You can pin ${GARDEN_SLOTS} projects — unpin one first`);
             return;
           }
         }
         await db.projects.update(id, { pinned: !project.pinned, updatedAt: isoNow() });
         await after();
-        showToast(project.pinned ? 'Removed from the Garden' : 'Pinned to the Garden');
+        showToast(project.pinned ? 'Unpinned' : 'Pinned to the top');
       },
 
       async reopenProject(id) {

@@ -36,7 +36,9 @@ export interface ProjectMeta {
   noteCount: number;
   milestonesDone: number;
   milestonesTotal: number;
-  /** Growth 1–5, from progress. Neglect never reduces it (§5.2). */
+  /** Completed-task points behind the current stage. */
+  points: number;
+  /** Growth 1–4, from points. Neglect never reduces it (§5.2). */
   stage: number;
   /** Vitality, from days since last activity. Independent of stage (§5.2). */
   vitality: Vitality;
@@ -69,12 +71,42 @@ export const VITALITY_DOT: Record<Vitality, string> = {
   browning: '#9a6b48',
 };
 
-/** §5.2 growth thresholds for Active projects. */
-export function stageFromPct(pct: number): number {
-  if (pct >= 100) return 5;
-  if (pct >= 70) return 4;
-  if (pct >= 40) return 3;
-  if (pct >= 15) return 2;
+/**
+ * Growth points: how much work a project has actually absorbed.
+ *
+ * One point per completed task, so a bigger, longer-running project grows a
+ * bigger plant — that's the whole idea, and it replaces the three different
+ * per-type formulas this used to have.
+ *
+ * Recurring tasks are the awkward case. Counting every repeat would send a
+ * weekly chore to the top level inside a quarter and hold it there forever;
+ * ignoring them (which the progress bar does, deliberately) would leave a
+ * retainer you've tended for two years as a seedling. So a series counts once
+ * for existing, plus a quarter of its repeats: upkeep matures a plant slowly,
+ * and doing fifteen different things still outruns doing one thing fifteen
+ * times.
+ */
+export function growthPoints(own: Task[]): number {
+  let points = 0;
+  const series = new Map<string, number>();
+
+  for (const t of own) {
+    if (!t.done) continue;
+    if (t.seriesId) series.set(t.seriesId, (series.get(t.seriesId) ?? 0) + 1);
+    else points += 1;
+  }
+  for (const completions of series.values()) {
+    points += 1 + Math.floor(completions / 4);
+  }
+  return points;
+}
+
+/** Four levels of illustration, four bands. Nothing done yet is a seedling
+ *  rather than an empty pot — there's no art for an empty pot. */
+export function stageFromPoints(points: number): number {
+  if (points >= 13) return 4;
+  if (points >= 9) return 3;
+  if (points >= 5) return 2;
   return 1;
 }
 
@@ -124,9 +156,12 @@ export function projectMeta(
   notes: Note[],
   dismissed: string[],
 ): ProjectMeta {
-  // Archived tasks are completed instances of a recurring series — they're
-  // history, and counting them would make a retainer's progress bar meaningless.
-  const own = tasks.filter((t) => t.projectId === project.id && !t.archived);
+  // Archived tasks are completed instances of a recurring series. They're
+  // history, and counting them would make a retainer's progress bar
+  // meaningless — but they're exactly what growth wants to see, so the two
+  // read from different lists.
+  const all = tasks.filter((t) => t.projectId === project.id);
+  const own = all.filter((t) => !t.archived);
   const total = own.length;
   const done = own.filter((t) => t.done).length;
   const pct = total ? Math.round((done / total) * 100) : 0;
@@ -137,19 +172,11 @@ export function projectMeta(
   const days = daysSince(project.lastActivityDate);
   const streak = project.type === 'retainer' ? retainerStreak(project, tasks) : 0;
 
-  let stage: number;
-  let vitality: Vitality;
-  if (project.type === 'active') {
-    stage = stageFromPct(pct);
-    vitality = vitalityFor(days);
-  } else if (project.type === 'retainer') {
-    stage = streak >= 8 ? 4 : streak >= 4 ? 3 : 2;
-    vitality = vitalityFor(days);
-  } else {
-    // Areas are evergreen reference homes — a calm constant plant (§3.1).
-    stage = 3;
-    vitality = 'healthy';
-  }
+  const points = growthPoints(all);
+  const stage = stageFromPoints(points);
+  // Areas stay the one exception to wilting: a reference home you consult
+  // every few weeks isn't neglected, and browning it would cry wolf.
+  const vitality: Vitality = project.type === 'area' ? 'healthy' : vitalityFor(days);
 
   const nudge =
     project.type === 'active' &&
@@ -165,6 +192,7 @@ export function projectMeta(
     noteCount,
     milestonesDone,
     milestonesTotal,
+    points,
     stage,
     vitality,
     daysSinceActivity: days,

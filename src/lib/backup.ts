@@ -1,5 +1,6 @@
 import { db, uid } from '../db';
 import type { Backup, Note, Person } from '../types';
+import { speciesOr } from './species';
 
 /**
  * v1 has no server, so this file is the only other copy of the data. It's also
@@ -78,11 +79,16 @@ export async function importBackup(text: string): Promise<void> {
         db.settings.clear(),
       ]);
       await Promise.all([
-        // A backup taken before Project.pinned existed restores after the
-        // migration has already run, so it has to be normalised here too —
-        // otherwise those projects come back with the field undefined.
+        // A backup taken before Project.pinned or .species existed restores
+        // after those migrations have already run, so it has to be normalised
+        // here too — otherwise those projects come back with the fields
+        // undefined and the plant renders as a broken image.
         db.projects.bulkAdd(
-          b.projects!.map((p) => ({ ...p, pinned: typeof p.pinned === 'boolean' ? p.pinned : false })),
+          b.projects!.map((p) => ({
+            ...p,
+            pinned: typeof p.pinned === 'boolean' ? p.pinned : false,
+            species: speciesOr(p.species),
+          })),
         ),
         db.tasks.bulkAdd(b.tasks!),
         db.notes.bulkAdd(b.notes!),
