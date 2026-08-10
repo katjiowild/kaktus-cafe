@@ -71,7 +71,7 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, openPerson }: 
     return (
       <div
         style={{
-          flex: '1 1 60%',
+          flex: '1 1 54%',
           minWidth: 0,
           display: 'flex',
           alignItems: 'center',
@@ -116,7 +116,7 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, openPerson }: 
     <div
       style={{
         animation: 'sbfade .3s ease',
-        ...(wide ? { flex: '1 1 60%', minWidth: 0 } : {}),
+        ...(wide ? { flex: '1 1 54%', minWidth: 0 } : {}),
       }}
     >
       {/* Neglect banner — the same 7-day signal as the Today nudge and the

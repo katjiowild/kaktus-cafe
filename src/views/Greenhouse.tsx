@@ -80,8 +80,12 @@ export function Greenhouse({ wide, openProject, openSheet, openSearch, go }: Vie
               position: 'sticky',
               top: 4,
               alignSelf: 'flex-start',
-              flex: '0 0 42%',
-              maxWidth: '42%',
+              // 46/54, the same split the Calendar uses. The panes were 40/60,
+              // 42/60 and 46/54 across three screens, which read as three
+              // different layouts; and the wider detail side was running text
+              // out to uncomfortably long lines.
+              flex: '0 0 46%',
+              maxWidth: '46%',
               maxHeight: 'calc(100vh - 150px)',
               overflowY: 'auto',
               borderRadius: 18,
