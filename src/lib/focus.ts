@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSetting, setSetting } from '../db';
-import { FocusAudio } from './focusAudio';
+import { DEFAULT_TRACK, FocusAudio, trackUrl, type TrackId } from './focusAudio';
 import { isoDate } from './dates';
 
 /** The three session lengths the design offers, in minutes. */
@@ -43,6 +43,9 @@ export interface FocusTimer {
   /** Today's intention, set on Today and shown on the Focus page. */
   intention: string;
   setIntention: (text: string) => void;
+  /** Which ambience plays while running. The clock at the end is unaffected. */
+  track: TrackId;
+  setTrack: (id: TrackId) => void;
   setDuration: (minutes: number) => void;
   /** Start, or pause if already running. */
   toggle: () => void;
@@ -64,6 +67,10 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
   const [running, setRunning] = useState(false);
   const [sessionsToday, setSessionsToday] = useState(0);
   const [intention, setIntentionState] = useState('');
+  const [track, setTrackState] = useState<TrackId>(DEFAULT_TRACK);
+  // Read by the ticker without re-registering it when the choice changes.
+  const trackRef = useRef<TrackId>(DEFAULT_TRACK);
+  trackRef.current = track;
 
   const deadline = useRef<number | null>(null);
   const audio = useRef<FocusAudio | null>(null);
@@ -77,11 +84,13 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
   // day is stale by definition, so it reads as zero rather than being carried.
   useEffect(() => {
     void (async () => {
-      const [saved, sessions, aim] = await Promise.all([
+      const [saved, sessions, aim, savedTrack] = await Promise.all([
         getSetting<number>('focus.duration', DEFAULT_DURATION),
         getSetting<SessionCount | null>('focus.sessions', null),
         getSetting<Intention | null>('focus.intention', null),
+        getSetting<TrackId>('focus.track', DEFAULT_TRACK),
       ]);
+      setTrackState(savedTrack);
       const mins = DURATIONS.includes(saved as (typeof DURATIONS)[number])
         ? saved
         : DEFAULT_DURATION;
@@ -129,7 +138,7 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
         if (!audio.current?.tickRunning) audio.current?.startTick();
       } else if (left <= FADE_FROM && !fading.current) {
         fading.current = true;
-        audio.current?.fadeOutRiver(left - TICK_FROM);
+        audio.current?.fadeOutLoop(left - TICK_FROM);
       }
     }, 250);
     return () => window.clearInterval(id);
@@ -171,7 +180,7 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
       // Resuming inside the fade window picks the ramp up where it belongs.
       const fadeIn = seconds <= FADE_FROM ? seconds - TICK_FROM : undefined;
       fading.current = fadeIn !== undefined;
-      void audio.current?.startRiver(fadeIn);
+      void audio.current?.startLoop(trackUrl(trackRef.current), fadeIn);
     }
     deadline.current = Date.now() + seconds * 1000;
     setRemaining(seconds);
@@ -190,6 +199,26 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
     [stopAudio],
   );
 
+  const setTrack = useCallback(
+    (id: TrackId) => {
+      setTrackState(id);
+      trackRef.current = id;
+      void setSetting('focus.track', id);
+      // Swap the sound under a running session rather than interrupting it —
+      // unlike changing the length, this doesn't change the clock.
+      if (running) {
+        const left = deadline.current
+          ? Math.max(0, Math.ceil((deadline.current - Date.now()) / 1000))
+          : 0;
+        if (left > TICK_FROM) {
+          const fadeIn = left <= FADE_FROM ? left - TICK_FROM : undefined;
+          void audio.current?.startLoop(trackUrl(id), fadeIn);
+        }
+      }
+    },
+    [running],
+  );
+
   const reset = useCallback(() => {
     deadline.current = null;
     setRunning(false);
@@ -205,6 +234,8 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
     sessionsToday,
     intention,
     setIntention,
+    track,
+    setTrack,
     setDuration,
     toggle,
     reset,

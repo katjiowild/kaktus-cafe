@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { C, SERIF } from '../tokens';
 import { DURATIONS, type FocusTimer } from '../lib/focus';
+import { TRACKS } from '../lib/focusAudio';
 
 const BG = `${import.meta.env.BASE_URL}focus/bg-focus.jpg`;
 
@@ -64,7 +65,8 @@ function SproutGlyph({ size = 16 }: { size?: number }) {
  * close button does.
  */
 export function Focus({ timer, onClose }: { timer: FocusTimer; onClose: () => void }) {
-  const { duration, remaining, fraction, running, intention, setDuration, toggle } = timer;
+  const { duration, remaining, fraction, running, intention, track, setTrack, setDuration, toggle } =
+    timer;
   const ring = useRef<SVGCircleElement>(null);
   const dial = useRef<HTMLButtonElement>(null);
 
@@ -328,6 +330,51 @@ export function Focus({ timer, onClose }: { timer: FocusTimer; onClose: () => vo
                     }}
                   >
                     {d} min
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Sound sits under the session lengths, sharing their shape but a
+              size down — the length is the decision, this is the garnish. */}
+          <div>
+            <div
+              style={{
+                textAlign: 'center',
+                color: '#e9e4d8',
+                fontSize: subtitleSize,
+                fontWeight: 600,
+                marginBottom: 9,
+                ...LEGIBLE,
+              }}
+            >
+              Sound
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {TRACKS.map((t) => {
+                const on = track === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setTrack(t.id)}
+                    aria-pressed={on}
+                    style={{
+                      flex: '0 0 auto',
+                      padding: `${Math.round(7 * (pillSize / 13.5))}px ${Math.round(
+                        14 * (pillSize / 13.5),
+                      )}px`,
+                      borderRadius: 20,
+                      border: on ? 'none' : '1px solid rgba(255,255,255,.32)',
+                      background: on ? C.sage : 'rgba(255,255,255,.08)',
+                      color: '#fff',
+                      fontFamily: 'inherit',
+                      fontSize: Math.max(12, pillSize - 1.5),
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {t.label}
                   </button>
                 );
               })}

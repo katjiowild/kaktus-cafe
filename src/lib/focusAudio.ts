@@ -1,68 +1,108 @@
 /**
- * Sound for a focus session: a river that loops for the length of it, and a
+ * Sound for a focus session: an ambient loop for the length of it, and a
  * ticking clock for the last few seconds.
  *
- * The river runs through Web Audio rather than `<audio loop>`. An HTML audio
+ * The loop runs through Web Audio rather than `<audio loop>`. An HTML audio
  * element restarts playback to loop, which leaves an audible hole every time
- * round — measured here at roughly a tenth of a second, and the reason the
- * loop sounded broken. A decoded buffer with `loop = true` is sample-accurate,
- * so the seam is inaudible.
- *
- * The file also carries 12ms of digital silence at its tail, left by the mp3
- * encoder. `loopEnd` stops just short of it. That's a real but small part of
- * the gap — trimming the file itself would have cost half a second of river
- * and fixed neither half of the problem.
+ * round — the reason the river sounded broken. A decoded buffer with
+ * `loop = true` is sample-accurate, so the seam is inaudible.
  */
 
-const RIVER = `${import.meta.env.BASE_URL}focus/river.mp3`;
+/** Ambience options offered on the Focus page, in order. */
+export const TRACKS = [
+  { id: 'stream', label: 'Stream', file: 'river.mp3' },
+  { id: 'rain', label: 'Rain & birds', file: 'rain.m4a' },
+  { id: 'none', label: 'No sound', file: null },
+] as const;
+
+export type TrackId = (typeof TRACKS)[number]['id'];
+
+export const DEFAULT_TRACK: TrackId = 'stream';
+
+export function trackUrl(id: TrackId): string | null {
+  const track = TRACKS.find((t) => t.id === id) ?? TRACKS[0];
+  return track.file ? `${import.meta.env.BASE_URL}focus/${track.file}` : null;
+}
+
 const TICK = `${import.meta.env.BASE_URL}focus/tick.mp3`;
 
-/** Encoder padding at the end of the river file. Measured, not guessed. */
-const TAIL_PADDING = 0.02;
+interface Loop {
+  buffer: AudioBuffer;
+  start: number;
+  end: number;
+}
+
+/**
+ * Encoders leave digital silence at one or both ends — 12ms on the river's
+ * mp3, none on the rain's aac. Rather than carry a constant per file, the
+ * silence is measured off the decoded buffer, which is correct for whatever
+ * gets added next.
+ */
+function findLoopPoints(buffer: AudioBuffer): { start: number; end: number } {
+  const data = buffer.getChannelData(0);
+  const edge = Math.min(data.length, Math.floor(buffer.sampleRate * 0.5));
+  let head = 0;
+  while (head < edge && data[head] === 0) head += 1;
+  let tail = data.length - 1;
+  while (tail > data.length - 1 - edge && data[tail] === 0) tail -= 1;
+  return {
+    start: head / buffer.sampleRate,
+    end: Math.max(0.1, (tail + 1) / buffer.sampleRate),
+  };
+}
 
 export class FocusAudio {
   private ctx: AudioContext | null = null;
-  private buffer: AudioBuffer | null = null;
+  private loops = new Map<string, Loop>();
   private source: AudioBufferSourceNode | null = null;
   private gain: GainNode | null = null;
   private tick: HTMLAudioElement | null = null;
   /** Bumped on every stop, so a decode that resolves late can tell it's stale. */
   private generation = 0;
 
-  /** Must be called from a user gesture — iOS won't start audio otherwise. */
-  async startRiver(fadeOverSeconds?: number): Promise<void> {
-    this.stopRiver();
+  /**
+   * Start the ambience. A null url is "No sound" — the clock at the end still
+   * plays, it just has nothing to come out of.
+   *
+   * Must be called from a user gesture: iOS won't start audio otherwise.
+   */
+  async startLoop(url: string | null, fadeOverSeconds?: number): Promise<void> {
+    this.stopLoop();
+    if (!url) return;
     const generation = this.generation;
 
     this.ctx ??= new AudioContext();
     const ctx = this.ctx;
     if (ctx.state === 'suspended') await ctx.resume();
 
-    if (!this.buffer) {
-      const bytes = await (await fetch(RIVER)).arrayBuffer();
-      this.buffer = await ctx.decodeAudioData(bytes);
+    let loop = this.loops.get(url);
+    if (!loop) {
+      const bytes = await (await fetch(url)).arrayBuffer();
+      const buffer = await ctx.decodeAudioData(bytes);
+      loop = { buffer, ...findLoopPoints(buffer) };
+      this.loops.set(url, loop);
     }
-    // Paused while the file was still decoding — don't start after the fact.
+    // Stopped while the file was still decoding — don't start after the fact.
     if (generation !== this.generation) return;
 
     const source = ctx.createBufferSource();
-    source.buffer = this.buffer;
+    source.buffer = loop.buffer;
     source.loop = true;
-    source.loopStart = 0;
-    source.loopEnd = Math.max(0.1, this.buffer.duration - TAIL_PADDING);
+    source.loopStart = loop.start;
+    source.loopEnd = loop.end;
 
     const gain = ctx.createGain();
     gain.gain.value = 1;
     source.connect(gain).connect(ctx.destination);
-    source.start();
+    source.start(0, loop.start);
 
     this.source = source;
     this.gain = gain;
-    if (fadeOverSeconds !== undefined) this.fadeOutRiver(fadeOverSeconds);
+    if (fadeOverSeconds !== undefined) this.fadeOutLoop(fadeOverSeconds);
   }
 
-  /** Ramp the river away over `seconds`, leaving the clock on its own. */
-  fadeOutRiver(seconds: number): void {
+  /** Ramp the ambience away over `seconds`, leaving the clock on its own. */
+  fadeOutLoop(seconds: number): void {
     if (!this.ctx || !this.gain) return;
     const now = this.ctx.currentTime;
     this.gain.gain.cancelScheduledValues(now);
@@ -72,7 +112,7 @@ export class FocusAudio {
     this.gain.gain.linearRampToValueAtTime(0.0001, now + Math.max(0.05, seconds));
   }
 
-  stopRiver(): void {
+  stopLoop(): void {
     this.generation += 1;
     if (this.source) {
       try {
@@ -105,7 +145,7 @@ export class FocusAudio {
   }
 
   stopAll(): void {
-    this.stopRiver();
+    this.stopLoop();
     this.stopTick();
   }
 }
