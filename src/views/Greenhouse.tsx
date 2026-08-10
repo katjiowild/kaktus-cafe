@@ -77,19 +77,7 @@ export function Greenhouse({ openProject, openSheet, openSearch, go }: ViewProps
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
-      >
-        {/* The photo is bright and warm, and the page is white text and pale
-            cards — without a deep scrim the title all but disappears into the
-            sunlight coming through the roof. */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background:
-              'linear-gradient(rgba(22,36,28,.5) 0%, rgba(22,36,28,.34) 26%, rgba(24,40,30,.5) 54%, rgba(20,34,26,.72) 100%)',
-          }}
-        />
-      </div>
+      />
 
       <div
         style={{
