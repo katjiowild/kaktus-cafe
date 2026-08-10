@@ -512,3 +512,25 @@ export function Card({
     </div>
   );
 }
+
+/** Fingerprint, for the biometric unlock toggle. Same 24×24 line set. */
+export function FingerprintIcon({ size = 17, color = C.sage }: { size?: number; color?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: 'block' }}
+    >
+      <path d="M12 11v3a9 9 0 0 1-.6 3.2" />
+      <path d="M8.5 10.5a3.5 3.5 0 0 1 7 0v2a12 12 0 0 1-.8 4.3" />
+      <path d="M5.5 13v-2a6.5 6.5 0 0 1 13 0v2a15 15 0 0 1-.7 4.6" />
+      <path d="M3 9a9.5 9.5 0 0 1 16-2" />
+    </svg>
+  );
+}

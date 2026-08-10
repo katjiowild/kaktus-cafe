@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { C, SERIF } from '../tokens';
 import { CAN_LOCK, setPin, verifyPin } from '../lib/lock';
+import { verifyBiometric } from '../lib/biometric';
 
 const BG = `${import.meta.env.BASE_URL}lock/bg-lock.jpg`;
 const LOGO = `${import.meta.env.BASE_URL}lock/logo.png`;
@@ -57,6 +58,26 @@ function Keypad({ onKey }: { onKey: (k: string) => void }) {
   );
 }
 
+function FingerprintGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 11v3a9 9 0 01-.6 3.2" />
+      <path d="M8.5 10.5a3.5 3.5 0 017 0v2a12 12 0 01-.8 4.3" />
+      <path d="M5.5 13v-2a6.5 6.5 0 0113 0v2a15 15 0 01-.7 4.6" />
+      <path d="M3 9a9.5 9.5 0 0116-2" />
+    </svg>
+  );
+}
+
 function Dots({ filled }: { filled: number }) {
   return (
     <div style={{ display: 'flex', gap: 16, marginBottom: 44 }}>
@@ -87,12 +108,15 @@ function Dots({ filled }: { filled: number }) {
 export function Lock({
   mode,
   name,
+  biometricOn = false,
   onUnlocked,
   onNameChosen,
   onCancel,
 }: {
   mode: LockMode;
   name: string;
+  /** Offer fingerprint / face as well as the keypad. */
+  biometricOn?: boolean;
   /** A correct PIN, a skipped PIN, or a newly set one. */
   onUnlocked: () => void;
   /** Onboarding only — saves the name and stays on screen for the PIN step. */
@@ -160,6 +184,27 @@ export function Lock({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, stage, first]);
+
+  /**
+   * Offered on unlock only. Tried once automatically on arrival — most phones
+   * allow that and it saves a tap — but a browser that insists on a gesture
+   * simply rejects, and the button below is then the way in. Either way the
+   * keypad stays on screen, so a failed finger costs nothing.
+   */
+  const askBiometric = async () => {
+    const result = await verifyBiometric();
+    if (result === 'ok') onUnlocked();
+    else if (result === 'unavailable') setBioPrompt(false);
+  };
+
+  const [bioPrompt, setBioPrompt] = useState(biometricOn && mode.kind === 'unlock');
+  const autoTried = useRef(false);
+  useEffect(() => {
+    if (!bioPrompt || autoTried.current) return;
+    autoTried.current = true;
+    void askBiometric();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bioPrompt]);
 
   const press = (k: string) => {
     setError('');
@@ -392,6 +437,26 @@ export function Lock({
                 </div>
               )}
               <Keypad onKey={press} />
+              {bioPrompt && (
+                <button
+                  onClick={() => void askBiometric()}
+                  style={{
+                    marginTop: 30,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: 'none',
+                    border: 'none',
+                    color: '#e8dbb4',
+                    fontFamily: 'inherit',
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <FingerprintGlyph /> Use fingerprint instead
+                </button>
+              )}
             </>
           )}
 
