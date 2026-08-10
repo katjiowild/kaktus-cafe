@@ -11,9 +11,28 @@ import {
   importBackup,
   importContacts,
 } from '../lib/backup';
+import {
+  clearPin,
+  DEFAULT_IDLE_MINUTES,
+  getIdleMinutes,
+  IDLE_CHOICES,
+  setIdleMinutes,
+  setName,
+  type LockState,
+} from '../lib/lock';
+import { Lock } from './Lock';
 
-export function Settings() {
+export function Settings({ lock }: { lock: LockState }) {
   const store = useStore();
+  const [nameDraft, setNameDraft] = useState(lock.name);
+  const [pinSheet, setPinSheet] = useState(false);
+  const [confirmRemovePin, setConfirmRemovePin] = useState(false);
+  const [idle, setIdle] = useState(DEFAULT_IDLE_MINUTES);
+
+  useEffect(() => setNameDraft(lock.name), [lock.name]);
+  useEffect(() => {
+    void getIdleMinutes().then(setIdle);
+  }, []);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [confirmClear, setConfirmClear] = useState(false);
   const [contactReport, setContactReport] = useState('');
@@ -72,7 +91,168 @@ export function Settings() {
 
   return (
     <div style={{ animation: 'sbfade .3s ease', marginTop: 6 }}>
-      <div style={{ ...h, marginTop: 6 }}>Backup</div>
+      <div style={{ ...h, marginTop: 6 }}>You</div>
+      <div style={panel}>
+        <label style={label}>Your name</label>
+        <input
+          value={nameDraft}
+          onChange={(e) => setNameDraft(e.target.value)}
+          onBlur={async () => {
+            await setName(nameDraft);
+            await lock.refresh();
+          }}
+          placeholder="Your name"
+          style={input}
+        />
+        <p style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>
+          Used in the greeting at the top of Today.
+        </p>
+      </div>
+
+      <div style={h}>Lock</div>
+      <div style={panel}>
+        <p style={{ fontSize: 13.5, color: C.softInk, lineHeight: 1.55 }}>
+          A PIN keeps the app closed to anyone who picks up your unlocked phone. It isn't
+          encryption — the data on this device is still readable by anything that can read the
+          browser's storage.
+        </p>
+        {lock.pinSet ? (
+          <>
+            <div style={{ display: 'flex', gap: 9, marginTop: 12 }}>
+              <button onClick={() => setPinSheet(true)} style={{ ...primaryBtn, flex: 1 }}>
+                Change PIN
+              </button>
+            </div>
+            <label style={{ ...label, marginTop: 16 }}>Ask for it again</label>
+            <select
+              value={idle}
+              onChange={async (e) => {
+                const next = Number(e.target.value);
+                setIdle(next);
+                await setIdleMinutes(next);
+                await lock.refresh();
+              }}
+              style={input}
+            >
+              {IDLE_CHOICES.map((c) => (
+                <option key={c.minutes} value={c.minutes}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <p style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>
+              Counted from when you last had the app open — locking your phone or switching away
+              both count as leaving.
+            </p>
+            <div style={{ display: 'flex', gap: 9, marginTop: 14 }}>
+              <button
+                onClick={() => lock.lockNow()}
+                style={{
+                  flex: 1,
+                  background: 'none',
+                  border: `1px solid ${C.line}`,
+                  borderRadius: 12,
+                  padding: 12,
+                  fontFamily: 'inherit',
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  color: C.softInk,
+                  cursor: 'pointer',
+                }}
+              >
+                Lock now
+              </button>
+            </div>
+            {confirmRemovePin ? (
+              <div style={{ display: 'flex', gap: 9, marginTop: 9 }}>
+                <button
+                  onClick={async () => {
+                    await clearPin();
+                    await lock.refresh();
+                    setConfirmRemovePin(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    background: C.overdue,
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 12,
+                    padding: 12,
+                    fontFamily: 'inherit',
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Yes, remove it
+                </button>
+                <button
+                  onClick={() => setConfirmRemovePin(false)}
+                  style={{
+                    flex: 1,
+                    background: 'none',
+                    border: `1px solid ${C.line}`,
+                    borderRadius: 12,
+                    padding: 12,
+                    fontFamily: 'inherit',
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    color: C.softInk,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Keep it
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmRemovePin(true)}
+                style={{
+                  width: '100%',
+                  marginTop: 9,
+                  background: 'none',
+                  color: C.overdue,
+                  border: 'none',
+                  fontFamily: 'inherit',
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: 8,
+                }}
+              >
+                Remove PIN
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => setPinSheet(true)}
+              style={{ ...primaryBtn, marginTop: 12 }}
+            >
+              Set a PIN
+            </button>
+            <p style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>
+              There's no way to reset a forgotten PIN — export a backup first.
+            </p>
+          </>
+        )}
+      </div>
+
+      {pinSheet && (
+        <Lock
+          mode={{ kind: 'set' }}
+          name={lock.name}
+          onUnlocked={async () => {
+            setPinSheet(false);
+            await lock.refresh();
+            store.showToast('PIN saved');
+          }}
+          onCancel={() => setPinSheet(false)}
+        />
+      )}
+
+      <div style={h}>Backup</div>
       <div style={panel}>
         <p style={{ fontSize: 13.5, color: C.softInk, lineHeight: 1.55 }}>
           Everything lives on this phone and nowhere else. Export a backup regularly and keep it
