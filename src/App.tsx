@@ -16,6 +16,8 @@ import { People, PersonDetail } from './views/People';
 import { Archive, Meetings, More, VisualSystem } from './views/Misc';
 import { Settings } from './views/Settings';
 import { useFocusTimer } from './lib/focus';
+import { useLock } from './lib/lock';
+import { Lock } from './views/Lock';
 import type { View, ViewProps } from './views/types';
 
 /** Two-pane master–detail when unfolded (owner-confirmed: Projects, People, Calendar). */
@@ -81,6 +83,9 @@ export function App() {
   // Lifted out of the Focus view so a session keeps running while you go and
   // look something up (v-phase2 §1).
   const focusTimer = useFocusTimer(() => store.showToast('Session complete 🌱'));
+  // Above the gate on purpose: a session keeps counting while the app is
+  // locked, and the calendar keeps syncing.
+  const lock = useLock();
 
   /**
    * Home-screen shortcuts land here as `?new=task` / `?new=meeting` (v6 §1) —
@@ -188,10 +193,11 @@ export function App() {
   const greeting = useMemo(() => {
     const h = new Date().getHours();
     const part = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-    return `${part}, Kathleen`;
-  }, []);
+    // No name yet — greet anyway rather than greeting the wrong person.
+    return lock.name ? `${part}, ${lock.name}` : part;
+  }, [lock.name]);
 
-  if (!store.ready) {
+  if (!store.ready || !lock.ready) {
     return (
       <div
         style={{
@@ -338,7 +344,7 @@ export function App() {
             {view === 'meetings' && <Meetings {...props} />}
             {view === 'more' && <More {...props} />}
             {view === 'archive' && <Archive {...props} />}
-            {view === 'settings' && <Settings />}
+            {view === 'settings' && <Settings lock={lock} />}
             {view === 'system' && <VisualSystem />}
 
             {/* Two-pane: the list stays put and the detail fills the right pane. */}
@@ -391,6 +397,25 @@ export function App() {
       )}
 
       <Toast message={store.toast} />
+
+      {/* Last, and above everything — the rest of the app stays mounted behind
+          it so unlocking doesn't reload or lose a running session. */}
+      {(lock.needsOnboarding || lock.locked) && (
+        <Lock
+          mode={lock.needsOnboarding ? { kind: 'onboard' } : { kind: 'unlock' }}
+          name={lock.name}
+          onUnlocked={() => {
+            // Onboarding ends here — after the PIN step, set or skipped — not
+            // when the name is entered.
+            if (lock.needsOnboarding) void lock.completeOnboarding();
+            else {
+              void lock.refresh();
+              lock.unlock();
+            }
+          }}
+          onNameChosen={lock.chooseName}
+        />
+      )}
     </div>
   );
 }
