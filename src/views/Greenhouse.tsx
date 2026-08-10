@@ -28,6 +28,17 @@ const TABS: { status: ProjectStatus; label: string; empty: string }[] = [
  *  normalised to one height — so the card scales them by level instead. */
 const SCALE_FOR_STAGE = [0.74, 0.83, 0.92, 1];
 
+/**
+ * Three across on a phone leaves each card about 105px wide, so everything
+ * inside it is sized from here rather than from fixed numbers — going back to
+ * two is this one line plus the sizes it drives.
+ */
+const COLUMNS = 3;
+const TILE =
+  COLUMNS >= 3
+    ? { art: 94, plant: 84, name: 13.5, meta: 11, pct: 17, pad: '8px 9px 10px' }
+    : { art: 124, plant: 112, name: 15.5, meta: 12, pct: 21, pad: '11px 12px 13px' };
+
 export function Greenhouse({ openProject, openSheet, openSearch, go }: ViewProps) {
   const { projects, tasks, notes, dismissed } = useStore();
   const [tab, setTab] = useState<ProjectStatus>('active');
@@ -75,7 +86,7 @@ export function Greenhouse({ openProject, openSheet, openSearch, go }: ViewProps
             position: 'absolute',
             inset: 0,
             background:
-              'linear-gradient(rgba(22,36,28,.62) 0%, rgba(22,36,28,.5) 26%, rgba(24,40,30,.66) 54%, rgba(20,34,26,.86) 100%)',
+              'linear-gradient(rgba(22,36,28,.5) 0%, rgba(22,36,28,.34) 26%, rgba(24,40,30,.5) 54%, rgba(20,34,26,.72) 100%)',
           }}
         />
       </div>
@@ -162,8 +173,8 @@ export function Greenhouse({ openProject, openSheet, openSearch, go }: ViewProps
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-            gap: 12,
+            gridTemplateColumns: `repeat(${COLUMNS}, minmax(0, 1fr))`,
+            gap: 10,
             marginTop: 18,
           }}
         >
@@ -176,7 +187,7 @@ export function Greenhouse({ openProject, openSheet, openSearch, go }: ViewProps
             <button
               onClick={() => openSheet({ type: 'project' })}
               style={{
-                minHeight: 210,
+                minHeight: COLUMNS >= 3 ? 168 : 210,
                 borderRadius: 16,
                 border: '1.5px dashed rgba(255,255,255,.55)',
                 background: 'rgba(255,255,255,.07)',
@@ -278,7 +289,7 @@ function ProjectTile({
       <div
         style={{
           position: 'relative',
-          height: 124,
+          height: TILE.art,
           display: 'flex',
           alignItems: 'flex-end',
           justifyContent: 'center',
@@ -289,7 +300,7 @@ function ProjectTile({
           stage={m.stage}
           vitality={m.vitality}
           species={p.species}
-          size={112 * scale}
+          size={TILE.plant * scale}
           // The neglected illustration already browns; the extra desaturation
           // is what makes it read at thumbnail size in a grid.
           style={{ filter: m.needsWater ? 'saturate(.7)' : undefined, marginBottom: 2 }}
@@ -315,11 +326,11 @@ function ProjectTile({
         )}
       </div>
 
-      <div style={{ padding: '11px 12px 13px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <div style={{ padding: TILE.pad, display: 'flex', flexDirection: 'column', flex: 1 }}>
         <div
           style={{
             fontFamily: SERIF,
-            fontSize: 15.5,
+            fontSize: TILE.name,
             fontWeight: 500,
             lineHeight: 1.25,
             color: C.ink,
@@ -327,7 +338,7 @@ function ProjectTile({
         >
           {p.name}
         </div>
-        <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+        <div style={{ marginTop: 'auto', paddingTop: 6 }}>
           <TileMeta project={p} meta={m} />
         </div>
       </div>
@@ -344,17 +355,17 @@ function TileMeta({ project: p, meta: m }: { project: Project; meta: ProjectMeta
   if (p.type === 'retainer') {
     return (
       <>
-        <div style={{ fontSize: 12, color: C.softInk }}>
+        <div style={{ fontSize: TILE.meta, color: C.softInk }}>
           {p.cadence === 'monthly' ? 'Monthly' : 'Weekly'} · {m.streak}
           {p.cadence === 'monthly' ? '-month' : '-week'} streak
         </div>
-        <div style={{ display: 'flex', gap: 3, marginTop: 8 }}>
+        <div style={{ display: 'flex', gap: 2.5, marginTop: 7 }}>
           {Array.from({ length: 8 }).map((_, i) => (
             <span
               key={i}
               style={{
-                width: 7,
-                height: 7,
+                width: 6,
+                height: 6,
                 borderRadius: '50%',
                 background: i < m.streak ? C.clay : '#e2d9c6',
               }}
@@ -367,7 +378,7 @@ function TileMeta({ project: p, meta: m }: { project: Project; meta: ProjectMeta
 
   if (p.type === 'area') {
     return (
-      <div style={{ fontSize: 12, color: C.softInk }}>
+      <div style={{ fontSize: TILE.meta, color: C.softInk }}>
         {m.noteCount} {m.noteCount === 1 ? 'note' : 'notes'}
         <div style={{ color: C.muted, marginTop: 2 }}>evergreen</div>
       </div>
@@ -376,13 +387,13 @@ function TileMeta({ project: p, meta: m }: { project: Project; meta: ProjectMeta
 
   return (
     <>
-      <div style={{ fontSize: 12, color: C.softInk }}>
+      <div style={{ fontSize: TILE.meta, color: C.softInk }}>
         {m.done} of {m.total} {m.total === 1 ? 'task' : 'tasks'}
       </div>
       <div
         style={{
           fontFamily: SERIF,
-          fontSize: 21,
+          fontSize: TILE.pct,
           fontWeight: 500,
           color: C.sageInk,
           margin: '2px 0 7px',
