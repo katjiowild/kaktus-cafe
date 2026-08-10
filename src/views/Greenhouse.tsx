@@ -355,8 +355,10 @@ function TileMeta({ project: p, meta: m }: { project: Project; meta: ProjectMeta
   if (p.type === 'retainer') {
     return (
       <>
+        {/* The cadence used to lead this line, but "Weekly · 20-week streak"
+            says weekly twice — the unit inside the streak already carries it. */}
         <div style={{ fontSize: TILE.meta, color: C.softInk }}>
-          {p.cadence === 'monthly' ? 'Monthly' : 'Weekly'} · {m.streak}
+          {m.streak}
           {p.cadence === 'monthly' ? '-month' : '-week'} streak
         </div>
         <div style={{ display: 'flex', gap: 2.5, marginTop: 7 }}>
