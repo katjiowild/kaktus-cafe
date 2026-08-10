@@ -49,9 +49,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // jpg/mp3 carry the Focus page's background and its two audio loops —
-        // without them a session on a train would be silent and grey.
-        globPatterns: ['**/*.{js,css,html,png,jpg,svg,woff2,mp3}'],
+        // jpg/mp3/m4a carry the Focus page's background and its audio — without
+        // them a session on a train would be silent and grey.
+        globPatterns: ['**/*.{js,css,html,png,jpg,svg,woff2,mp3,m4a}'],
         // Google Fonts must survive offline — the app is unusable-looking without Zilla Slab.
         runtimeCaching: [
           {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSetting, setSetting } from '../db';
+import { DEFAULT_TRACK, FocusAudio, trackUrl, type TrackId } from './focusAudio';
 import { isoDate } from './dates';
 
 /** The three session lengths the design offers, in minutes. */
@@ -7,10 +8,10 @@ export const DURATIONS = [15, 25, 50] as const;
 
 const DEFAULT_DURATION = 25;
 
-/** Ambient loop, plus the ticking clock that joins for the last few seconds. */
-const RIVER = `${import.meta.env.BASE_URL}focus/river.mp3`;
-const TICK = `${import.meta.env.BASE_URL}focus/tick.mp3`;
+/** Seconds left when the ticking clock takes over. */
 const TICK_FROM = 5;
+/** Seconds left when the river starts receding, so it's gone by TICK_FROM. */
+const FADE_FROM = 8;
 
 interface SessionCount {
   date: string;
@@ -42,6 +43,9 @@ export interface FocusTimer {
   /** Today's intention, set on Today and shown on the Focus page. */
   intention: string;
   setIntention: (text: string) => void;
+  /** Which ambience plays while running. The clock at the end is unaffected. */
+  track: TrackId;
+  setTrack: (id: TrackId) => void;
   setDuration: (minutes: number) => void;
   /** Start, or pause if already running. */
   toggle: () => void;
@@ -63,10 +67,16 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
   const [running, setRunning] = useState(false);
   const [sessionsToday, setSessionsToday] = useState(0);
   const [intention, setIntentionState] = useState('');
+  const [track, setTrackState] = useState<TrackId>(DEFAULT_TRACK);
+  // Read by the ticker without re-registering it when the choice changes.
+  const trackRef = useRef<TrackId>(DEFAULT_TRACK);
+  trackRef.current = track;
 
   const deadline = useRef<number | null>(null);
-  const river = useRef<HTMLAudioElement | null>(null);
-  const tick = useRef<HTMLAudioElement | null>(null);
+  const audio = useRef<FocusAudio | null>(null);
+  if (!audio.current) audio.current = new FocusAudio();
+  /** Set once per session so the fade is scheduled a single time. */
+  const fading = useRef(false);
   const onDone = useRef(onComplete);
   onDone.current = onComplete;
 
@@ -74,11 +84,13 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
   // day is stale by definition, so it reads as zero rather than being carried.
   useEffect(() => {
     void (async () => {
-      const [saved, sessions, aim] = await Promise.all([
+      const [saved, sessions, aim, savedTrack] = await Promise.all([
         getSetting<number>('focus.duration', DEFAULT_DURATION),
         getSetting<SessionCount | null>('focus.sessions', null),
         getSetting<Intention | null>('focus.intention', null),
+        getSetting<TrackId>('focus.track', DEFAULT_TRACK),
       ]);
+      setTrackState(savedTrack);
       const mins = DURATIONS.includes(saved as (typeof DURATIONS)[number])
         ? saved
         : DEFAULT_DURATION;
@@ -96,11 +108,8 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
   }, []);
 
   const stopAudio = useCallback(() => {
-    for (const ref of [river, tick]) {
-      if (!ref.current) continue;
-      ref.current.pause();
-      ref.current.currentTime = 0;
-    }
+    fading.current = false;
+    audio.current?.stopAll();
   }, []);
 
   const finish = useCallback(async () => {
@@ -124,8 +133,12 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
       setRemaining(left);
       if (left === 0) {
         void finish();
-      } else if (left <= TICK_FROM && tick.current?.paused) {
-        void tick.current.play().catch(() => {});
+      } else if (left <= TICK_FROM) {
+        // The river has faded by now; the clock finishes alone.
+        if (!audio.current?.tickRunning) audio.current?.startTick();
+      } else if (left <= FADE_FROM && !fading.current) {
+        fading.current = true;
+        audio.current?.fadeOutLoop(left - TICK_FROM);
       }
     }, 250);
     return () => window.clearInterval(id);
@@ -153,17 +166,22 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
     if (running) {
       deadline.current = null;
       setRunning(false);
-      river.current?.pause();
-      tick.current?.pause();
+      audio.current?.stopAll();
+      fading.current = false;
       return;
     }
     // A finished session restarts from the top rather than sitting at 00:00.
     const seconds = remaining > 0 ? remaining : duration * 60;
-    // Built on the tap, not at mount: iOS only grants playback from a gesture.
-    river.current ??= Object.assign(new Audio(RIVER), { loop: true });
-    tick.current ??= Object.assign(new Audio(TICK), { loop: true });
-    void river.current.play().catch(() => {});
-    if (seconds <= TICK_FROM) void tick.current.play().catch(() => {});
+    // Started from the tap, not at mount: iOS only grants playback from a gesture.
+    if (seconds <= TICK_FROM) {
+      audio.current?.startTick();
+      fading.current = true;
+    } else {
+      // Resuming inside the fade window picks the ramp up where it belongs.
+      const fadeIn = seconds <= FADE_FROM ? seconds - TICK_FROM : undefined;
+      fading.current = fadeIn !== undefined;
+      void audio.current?.startLoop(trackUrl(trackRef.current), fadeIn);
+    }
     deadline.current = Date.now() + seconds * 1000;
     setRemaining(seconds);
     setRunning(true);
@@ -181,6 +199,26 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
     [stopAudio],
   );
 
+  const setTrack = useCallback(
+    (id: TrackId) => {
+      setTrackState(id);
+      trackRef.current = id;
+      void setSetting('focus.track', id);
+      // Swap the sound under a running session rather than interrupting it —
+      // unlike changing the length, this doesn't change the clock.
+      if (running) {
+        const left = deadline.current
+          ? Math.max(0, Math.ceil((deadline.current - Date.now()) / 1000))
+          : 0;
+        if (left > TICK_FROM) {
+          const fadeIn = left <= FADE_FROM ? left - TICK_FROM : undefined;
+          void audio.current?.startLoop(trackUrl(id), fadeIn);
+        }
+      }
+    },
+    [running],
+  );
+
   const reset = useCallback(() => {
     deadline.current = null;
     setRunning(false);
@@ -196,6 +234,8 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
     sessionsToday,
     intention,
     setIntention,
+    track,
+    setTrack,
     setDuration,
     toggle,
     reset,
