@@ -147,6 +147,56 @@ export function useFocusTimer(onComplete: (sessions: number) => void): FocusTime
   // Whatever else happens, the loop shouldn't outlive the app.
   useEffect(() => stopAudio, [stopAudio]);
 
+  /**
+   * A running session should keep the screen awake — the clock is the point of
+   * the page, and watching it go dark mid-session is the one thing a focus
+   * timer shouldn't do. The lock is held only while running, so pausing,
+   * finishing, changing the length or leaving the page all give it straight
+   * back and the phone sleeps normally again.
+   *
+   * Not supported everywhere (iOS Safari before 16.4, among others) and it also
+   * rejects when the tab isn't visible, so every request is allowed to fail
+   * quietly: the timer itself is unaffected either way.
+   */
+  useEffect(() => {
+    if (!running) return;
+    let cancelled = false;
+    let sentinel: WakeLockSentinel | null = null;
+
+    const acquire = async () => {
+      if (cancelled || sentinel) return;
+      try {
+        const lock = await navigator.wakeLock.request('screen');
+        // The effect may have been torn down while the request was in flight.
+        if (cancelled) {
+          void lock.release();
+          return;
+        }
+        sentinel = lock;
+        // The system drops the lock on its own when the tab is backgrounded;
+        // forgetting it here is what lets `visibilitychange` ask again.
+        lock.addEventListener('release', () => {
+          if (sentinel === lock) sentinel = null;
+        });
+      } catch {
+        // Unsupported browser, or the request was refused. Nothing to do.
+      }
+    };
+
+    void acquire();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void acquire();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+      void sentinel?.release();
+      sentinel = null;
+    };
+  }, [running]);
+
   // Read through a ref so the callback identity is stable and an animation
   // frame loop can hold onto it without restarting every second.
   const live = useRef({ duration, remaining });
