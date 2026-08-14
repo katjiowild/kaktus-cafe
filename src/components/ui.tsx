@@ -248,6 +248,65 @@ export function SectionHeader({ title, meta }: { title: string; meta?: ReactNode
   );
 }
 
+/**
+ * The detail-page tab strip. Project and Person both use it, so the two pages
+ * can't drift apart the way they would with the markup copied into each.
+ */
+export function Tabs<T extends string>({
+  tabs,
+  active,
+  onChange,
+}: {
+  tabs: readonly { id: T; label: string }[];
+  active: T;
+  onChange: (id: T) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 22,
+        marginTop: 18,
+        borderBottom: `1px solid ${C.cardBorder}`,
+      }}
+    >
+      {tabs.map((t) => {
+        const on = active === t.id;
+        return (
+          <button
+            key={t.id}
+            onClick={() => onChange(t.id)}
+            aria-current={on ? 'page' : undefined}
+            style={{
+              background: 'none',
+              border: 'none',
+              borderBottom: `2px solid ${on ? C.deepSage : 'transparent'}`,
+              padding: '0 0 9px',
+              marginBottom: -1,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 14,
+              fontWeight: 600,
+              color: on ? C.ink : C.muted,
+            }}
+          >
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The serif sub-heading used inside a tab panel. */
+export function TabHeading({ children }: { children: ReactNode }) {
+  return (
+    <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 500, margin: '18px 0 8px' }}>
+      {children}
+    </div>
+  );
+}
+
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
     <div style={{ textAlign: 'center', padding: '30px 20px', color: C.muted, fontSize: 14, lineHeight: 1.5 }}>
@@ -285,26 +344,143 @@ export function Toast({ message }: { message: string }) {
 
 // ---------- icons ----------
 
-const NAV_PATHS: Record<string, string> = {
-  today: 'M3 12l9-9 9 9 M5 10v10h14V10',
-  projects: 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z',
-  /** A potted succulent — the Garden tab, and the only nav glyph that draws
-   *  the thing the page is full of rather than a document or a grid. */
-  garden: 'M6.5 14h11l-1.1 6H7.6z M12 14V8 M12 12c0-2.6 1.9-4.6 4.5-4.6 0 2.6-1.9 4.6-4.5 4.6z M12 12.6c0-2.6-1.9-4.6-4.5-4.6 0 2.6 1.9 4.6 4.5 4.6z',
-  calendar: 'M4 5h16v16H4z M4 10h16 M8 3v4 M16 3v4',
-  notes: 'M6 3h9l3 3v15H6z M14 3v4h4',
-  tasks: 'M9 6h11 M9 12h11 M9 18h11 M4 6l1 1 2-2 M4 12l1 1 2-2 M4 18l1 1 2-2',
-  focus: 'M6 8h10v6a5 5 0 01-5 5 5 5 0 01-5-5z M16 9h2a3 3 0 010 6h-2',
-  more: 'M5 12h.01 M12 12h.01 M19 12h.01',
-  // Menu-row glyphs. Same 24×24, 1.9 stroke, round caps as the nav set —
-  // emoji sat outside the drawn language and read as a different app.
-  meetings: 'M4 5h16v15H4z M4 10h16 M8 3v4 M16 3v4',
-  people: 'M12 12a4 4 0 100-8 4 4 0 000 8z M4 20c0-4 4-6 8-6s8 2 8 6',
-  system: 'M12 3C7 3 3 7 3 12c5 0 9-4 9-9z M3 12c0 5 4 9 9 9',
-  archive: 'M4 7h16v13H4z M4 4h16v3H4z M10 11h4',
-  flag: 'M6 3v18 M6 4h9l-2 3 2 3H6',
-  settings:
-    'M12 15a3 3 0 100-6 3 3 0 000 6z M5 12a7 7 0 01.3-2l-1.6-1.3 1.5-2.6 2 .6a7 7 0 011.7-1l.3-2h3l.3 2a7 7 0 011.7 1l2-.6 1.5 2.6L18 10a7 7 0 010 4l1.6 1.3-1.5 2.6-2-.6a7 7 0 01-1.7 1l-.3 2h-3l-.3-2a7 7 0 01-1.7-1l-2 .6-1.5-2.6L5 14a7 7 0 01-.3-2z',
+/**
+ * The drawn icon set.
+ *
+ * Geometry for today, notes, calendar, focus, garden, projects and tasks comes
+ * verbatim from the kaktus-cafe-icon-pack SVGs. The pack ships each of those as
+ * a default/active pair, but the two differ only in stroke colour — and NavIcon
+ * already takes its colour from the caller via currentColor — so only one copy
+ * of each shape is needed here.
+ *
+ * The remaining seven are drawn to match: same 24×24 grid, same 1.7 rounded
+ * stroke, same habit of building a glyph from a couple of plain shapes. They
+ * cover the menu rows and project detail, which the pack has no icons for.
+ *
+ * Values are nodes rather than path strings because several pack icons are
+ * built from <rect>, which the old string table couldn't express.
+ */
+const CALENDAR = (
+  <>
+    <rect x={3.5} y={4.5} width={17} height={17} rx={3} />
+    <path d="M8 2.5v4M16 2.5v4" />
+    <path d="M3.5 9.2h17" />
+    <path d="M8 13.2h.01M12 13.2h.01M16 13.2h.01M8 16.8h.01M12 16.8h.01" />
+  </>
+);
+
+const NAV_ICONS: Record<string, React.ReactNode> = {
+  // ---- from the icon pack ----
+  today: (
+    <>
+      <path d="m3 10 9-7 9 7" />
+      <path d="M5 9.5V21h14V9.5" />
+      <path d="M9.5 21v-6h5v6" />
+    </>
+  ),
+  /** A notepad: two binding tabs over the top edge, three ruled lines, no
+   *  header rule — that last one is what keeps it apart from calendar, which
+   *  is otherwise the same rounded rect with the same two tabs. */
+  notes: (
+    <>
+      <rect x={4} y={4.4} width={16.2} height={16.8} rx={2.6} />
+      <path d="M8 2.5v3.8M15.7 2.5v3.8" />
+      <path d="M7.9 9.8h8.1M7.9 13.1h8.1M7.9 16.3h4.7" />
+    </>
+  ),
+  calendar: CALENDAR,
+  /** Meetings shows the calendar too. It used to carry a clock in the corner to
+   *  tell the two apart, but that was drawn against the old squarer calendar
+   *  and read as a leftover once this one landed. */
+  meetings: CALENDAR,
+  focus: (
+    <>
+      <path d="M3 8.6h16" />
+      <path d="M3 8.6c.3 5.2 1.6 8.8 3.8 10.1 1.2.5 2.7.8 4.2.8s3-.3 4.2-.8c2.2-1.3 3.5-4.9 3.8-10.1" />
+      <path d="M18.9 10.3c2.2 0 3.3 1.2 3.2 2.8-.1 1.7-1.6 2.8-3.8 3.1" />
+      <path d="M5.8 10.7c-.3 1.8-.1 3.4.5 4.9" />
+      <path d="M3.6 19.7h16.2M6.5 21.8h10.7" />
+      <path d="M9.4 7c-.9-1.1.9-2.1 0-3.5M12 7.1c-1-1.3 1-2.4 0-5" />
+    </>
+  ),
+  /**
+   * A three-leaf sprout on a bowed stem — the pack's top-nav Greenhouse mark.
+   * Each leaf is two circular arcs meeting at a point, plus a midrib.
+   *
+   * The leaves are drawn fuller than the reference sheet's. That sheet renders
+   * at roughly a 0.6 stroke on this grid, where a slim leaf still shows daylight
+   * either side of its midrib; at the 1.7 this app draws, the same outline
+   * closes up and the leaf reads as a solid blob. These radii keep about a unit
+   * of open channel down each side of every midrib.
+   */
+  garden: (
+    <>
+      <path d="M11.1 21.6c-.2-3.9.1-7.6.5-10.6" />
+      <path d="M10.7 11.2A6.8 6.8 0 0 1 17.8 2.5 6.8 6.8 0 0 1 10.7 11.2Z" />
+      <path d="M10.7 11.2 17.8 2.5" />
+      <path d="M9.7 17.2A6.2 6.2 0 0 1 4.4 8.4 6.2 6.2 0 0 1 9.7 17.2Z" />
+      <path d="M9.7 17.2 4.4 8.4" />
+      <path d="M11.5 19.6A5.9 5.9 0 0 1 19.6 14.2 5.9 5.9 0 0 1 11.5 19.6Z" />
+      <path d="M11.5 19.6 19.6 14.2" />
+    </>
+  ),
+  projects: (
+    <>
+      <rect x={4} y={4} width={6} height={6} rx={1} />
+      <rect x={14} y={4} width={6} height={6} rx={1} />
+      <rect x={4} y={14} width={6} height={6} rx={1} />
+      <rect x={14} y={14} width={6} height={6} rx={1} />
+    </>
+  ),
+  /** The box is deliberately unclosed at the top right — the tick breaks out
+   *  through the gap rather than being contained by it. */
+  tasks: (
+    <>
+      <path d="M17 3.5H6A2.5 2.5 0 0 0 3.5 6v12A2.5 2.5 0 0 0 6 20.5h12a2.5 2.5 0 0 0 2.5-2.5v-8" />
+      <path d="m8.2 11.7 3.3 3.3L21.6 4.1" />
+    </>
+  ),
+
+  // ---- drawn to match, for the slots the pack doesn't cover ----
+  people: (
+    <>
+      <circle cx={12} cy={8.5} r={3.5} />
+      <path d="M5 20c0-3.5 3.1-5.5 7-5.5s7 2 7 5.5" />
+    </>
+  ),
+  /** A palette, for Visual system — the page about plants, types and colour. */
+  system: (
+    <>
+      <path d="M12 3.5a8.5 8.5 0 1 0 0 17c1 0 1.6-.7 1.6-1.5 0-1.3-.9-1.6-.9-2.5 0-.8.6-1.4 1.4-1.4h1.4a4.5 4.5 0 0 0 4.5-4.5c0-4-3.8-7.1-8-7.1Z" />
+      <path d="M8 10h.01M11 7.5h.01M15 8.5h.01M6.5 13.5h.01" />
+    </>
+  ),
+  archive: (
+    <>
+      <rect x={3} y={4} width={18} height={4} rx={1.5} />
+      <path d="M5 8v11.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8" />
+      <path d="M10 12h4" />
+    </>
+  ),
+  flag: (
+    <>
+      <path d="M6 3v18" />
+      <path d="M6 4.5h11l-2.2 3.5L17 11.5H6z" />
+    </>
+  ),
+  /** Sliders, not a gear. A gear at the menu's 20px needs teeth finer than the
+   *  pack's 1.7 stroke can draw, and what survives reads as a sun. */
+  settings: (
+    <>
+      <path d="M4 7h9.5M18.5 7H20" />
+      <path d="M4 12h3.5M12.5 12H20" />
+      <path d="M4 17h8.5M17.5 17H20" />
+      <circle cx={16} cy={7} r={2} />
+      <circle cx={10} cy={12} r={2} />
+      <circle cx={15} cy={17} r={2} />
+    </>
+  ),
+  more: <path d="M5 12h.01M12 12h.01M19 12h.01" />,
 };
 
 /** Map-pin, for a meeting's location. Drawn, not the 📍 emoji, which rendered
@@ -365,7 +541,6 @@ export function HamburgerIcon({ size = 22 }: { size?: number }) {
 }
 
 export function NavIcon({ name, size = 22 }: { name: string; size?: number }) {
-  const segments = NAV_PATHS[name].split(' M');
   return (
     <svg
       viewBox="0 0 24 24"
@@ -373,13 +548,11 @@ export function NavIcon({ name, size = 22 }: { name: string; size?: number }) {
       height={size}
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.9}
+      strokeWidth={1.7}
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      {segments.map((seg, i) => (
-        <path key={i} d={(i ? 'M' : '') + seg} />
-      ))}
+      {NAV_ICONS[name]}
     </svg>
   );
 }
@@ -442,15 +615,6 @@ export function PinIcon({
     >
       <path d="M12 17v5" />
       <path d="M9 10.76V4h6v6.76a2 2 0 0 0 .59 1.41l1.7 1.7A1 1 0 0 1 16.59 16H7.4a1 1 0 0 1-.7-1.71l1.7-1.7A2 2 0 0 0 9 10.76z" />
-    </svg>
-  );
-}
-
-export function PersonIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={{ display: 'block' }}>
-      <circle cx={12} cy={8} r={4} />
-      <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7z" />
     </svg>
   );
 }

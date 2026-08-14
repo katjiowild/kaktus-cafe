@@ -6,7 +6,15 @@ import { shortDate } from '../lib/dates';
 import { Plant } from '../components/Plant';
 import { TaskRow } from '../components/TaskRow';
 import { PersonPicker } from '../components/PersonPicker';
-import { Avatar, EmptyState, NavIcon, PencilIcon, TypeBadge } from '../components/ui';
+import {
+  Avatar,
+  EmptyState,
+  NavIcon,
+  PencilIcon,
+  TabHeading,
+  Tabs,
+  TypeBadge,
+} from '../components/ui';
 import type { ProjectStatus } from '../types';
 import type { ViewProps } from './types';
 import { Linkify } from '../components/Linkify';
@@ -49,14 +57,6 @@ function StatusPill({ status }: { status: ProjectStatus }) {
     >
       {s.label}
     </span>
-  );
-}
-
-function TabHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 500, margin: '18px 0 8px' }}>
-      {children}
-    </div>
   );
 }
 
@@ -246,40 +246,7 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, openPerson }: 
         <div style={{ marginTop: 12, fontSize: 12.5, color: C.softInk }}>{dateRange}</div>
       )}
 
-      {/* Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 22,
-          marginTop: 18,
-          borderBottom: `1px solid ${C.cardBorder}`,
-        }}
-      >
-        {TABS.map((t) => {
-          const on = tab === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              aria-current={on ? 'page' : undefined}
-              style={{
-                background: 'none',
-                border: 'none',
-                borderBottom: `2px solid ${on ? C.deepSage : 'transparent'}`,
-                padding: '0 0 9px',
-                marginBottom: -1,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontSize: 14,
-                fontWeight: 600,
-                color: on ? C.ink : C.muted,
-              }}
-            >
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
+      <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
       {tab === 'overview' && (
         <>
@@ -446,19 +413,32 @@ export function ProjectDetail({ wide, activeProjectId, openSheet, openPerson }: 
                       ↓
                     </button>
                     <button
-                      onClick={() => void store.removeMilestone(project.id, ms.id)}
-                      aria-label="Remove milestone"
+                      onClick={() =>
+                        openSheet({
+                          type: 'mini',
+                          kind: 'milestone',
+                          ctx: project.id,
+                          title: 'Edit milestone',
+                          label: 'Milestone',
+                          placeholder: 'e.g. Final review',
+                          editId: ms.id,
+                          initialText: ms.text,
+                          initialDate: ms.date,
+                        })
+                      }
+                      aria-label="Edit milestone"
                       style={{
                         background: 'none',
                         border: 'none',
                         color: C.faint,
                         cursor: 'pointer',
-                        fontSize: 16,
+                        display: 'flex',
+                        alignItems: 'center',
                         lineHeight: 1,
                         padding: '0 2px',
                       }}
                     >
-                      ×
+                      <PencilIcon size={14} color={C.faint} />
                     </button>
                   </div>
                 ))}

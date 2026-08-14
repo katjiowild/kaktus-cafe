@@ -1,5 +1,5 @@
 import { C, NARROW_MAX, WIDE_MAX } from '../tokens';
-import { NavIcon, PersonIcon } from './ui';
+import { NavIcon } from './ui';
 import type { View } from '../views/types';
 
 /**
@@ -97,12 +97,15 @@ export function BottomNav({
 
 export type AddKind = 'task' | 'note' | 'project' | 'meeting' | 'person';
 
-const RADIAL: { kind: AddKind; label: string; glyph: React.ReactNode }[] = [
-  { kind: 'task', label: 'Task', glyph: '✓' },
-  { kind: 'note', label: 'Note', glyph: '✎' },
-  { kind: 'project', label: 'Project', glyph: '▤' },
-  { kind: 'meeting', label: 'Meeting', glyph: '◷' },
-  { kind: 'person', label: 'Person', glyph: <PersonIcon size={16} /> },
+/** Drawn glyphs, not the typographic ✓ ✎ ▤ ◷ these used to be. Those came from
+ *  whatever font happened to render them, so the fan was the one place in the
+ *  app where the icons weren't the app's own. */
+const RADIAL: { kind: AddKind; label: string; icon: string }[] = [
+  { kind: 'task', label: 'Task', icon: 'tasks' },
+  { kind: 'note', label: 'Note', icon: 'notes' },
+  { kind: 'project', label: 'Project', icon: 'projects' },
+  { kind: 'meeting', label: 'Meeting', icon: 'meetings' },
+  { kind: 'person', label: 'Person', icon: 'people' },
 ];
 
 /** The + fans 5 labelled icons up-and-left along an arc (§2). */
@@ -122,8 +125,17 @@ export function RadialMenu({
   const fabRight = wide
     ? `calc(max(0px, (100% - ${WIDE_MAX}px)/2) + 22px)`
     : `calc(max(0px, 50% - ${NARROW_MAX / 2}px) + 22px)`;
-  const radius = 82;
-  const angles = [198, 172, 146, 120, 94];
+  // A ring hugging the +, rather than a long arc flung away from it. Task sits
+  // due south of the button and the rest come round the left to Person, just
+  // east of north — 188° of sweep, so the 50px circles clear each other on a
+  // radius barely wider than the old one (chord = 2·radius·sin(step/2); the
+  // old 82px/26° put centres 37px apart, i.e. a 13px overlap on every seam).
+  //
+  // Person is the constraint on how far the sweep can run: any further round
+  // and it leaves the right edge of the screen. Task is free to overhang the
+  // nav bar, which is behind the scrim and untappable while the fan is open.
+  const radius = 74;
+  const angles = [270, 223, 176, 129, 82];
 
   return (
     <>
@@ -165,7 +177,9 @@ export function RadialMenu({
                 pointerEvents: open ? 'auto' : 'none',
               }}
             >
-              <span style={{ fontSize: 18, lineHeight: 1 }}>{item.glyph}</span>
+              <span style={{ display: 'flex', lineHeight: 1 }}>
+                <NavIcon name={item.icon} size={18} />
+              </span>
               <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: '.02em' }}>
                 {item.label}
               </span>

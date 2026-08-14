@@ -1,8 +1,16 @@
 import { useState } from 'react';
-import { ACCENT, C, dashedBtn, SERIF } from '../tokens';
+import { ACCENT, C, dashedBtn } from '../tokens';
 import { useStore } from '../store';
 import { isoDate, shortDate } from '../lib/dates';
-import { Avatar, Card, EmptyState, PencilIcon, SectionHeader, TypeBadge } from '../components/ui';
+import {
+  Avatar,
+  Card,
+  EmptyState,
+  PencilIcon,
+  TabHeading,
+  Tabs,
+  TypeBadge,
+} from '../components/ui';
 import type { ViewProps } from './types';
 import { Linkify } from '../components/Linkify';
 
@@ -165,9 +173,19 @@ export function People({ wide, openPerson, openSheet }: ViewProps) {
   );
 }
 
+type PersonTab = 'overview' | 'meetings' | 'projects' | 'notes';
+
+const PERSON_TABS: { id: PersonTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'meetings', label: 'Meetings' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'notes', label: 'Notes' },
+];
+
 export function PersonDetail({ wide, activePersonId, openSheet, openProject }: ViewProps) {
   const store = useStore();
   const { people, meetings, notes, projects } = store;
+  const [tab, setTab] = useState<PersonTab>('overview');
   const person = people.find((p) => p.id === activePersonId);
 
   if (!person) {
@@ -209,170 +227,171 @@ export function PersonDetail({ wide, activePersonId, openSheet, openProject }: V
         ...(wide ? { flex: '1 1 60%', minWidth: 0 } : {}),
       }}
     >
-      <div
-        style={{
-          position: 'relative',
-          background: C.card,
-          border: `1px solid ${C.cardBorder}`,
-          borderRadius: 16,
-          boxShadow: '0 1px 2px rgba(36,43,40,.05), 0 6px 18px rgba(36,43,40,.05)',
-          padding: 18,
-          display: 'flex',
-          gap: 15,
-          alignItems: 'center',
-        }}
-      >
-        <button
-          onClick={() => openSheet({ type: 'person', personId: person.id })}
-          aria-label="Edit person"
-          title="Edit person"
-          style={{
-            position: 'absolute',
-            bottom: 10,
-            right: 10,
-            background: 'none',
-            border: 'none',
-            padding: 5,
-            cursor: 'pointer',
-            display: 'flex',
-            lineHeight: 0,
-          }}
-        >
-          <PencilIcon />
-        </button>
-        <Avatar name={person.name} size={56} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 500 }}>{person.name}</div>
-          {person.role && (
-            <div style={{ fontSize: 13, color: C.softInk, marginTop: 3 }}>
-              <Linkify text={person.role} />
-            </div>
-          )}
-          <div style={{ fontSize: 12.5, color: C.muted, marginTop: 6, lineHeight: 1.4 }}>
-            How we met: {person.howMet ? <Linkify text={person.howMet} /> : '—'}
-          </div>
-        </div>
-      </div>
+      {/* No header card. The chrome above already prints the person's name as
+          the page title, so a card repeating it — with the role stranded above
+          the tab strip — said everything twice. Role now opens About, where the
+          rest of their detail lives. */}
+      <Tabs tabs={PERSON_TABS} active={tab} onChange={setTab} />
 
-      <button
-        onClick={() => void store.updatePerson(person.id, { followUp: !person.followUp })}
-        style={{
-          width: '100%',
-          marginTop: 12,
-          background: person.followUp ? '#f3e6df' : C.card,
-          color: person.followUp ? C.clay : C.softInk,
-          border: `1px solid ${person.followUp ? '#e6c9bd' : C.line}`,
-          borderRadius: 12,
-          padding: 12,
-          fontFamily: 'inherit',
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: 'pointer',
-        }}
-      >
-        {person.followUp ? '✓ Following up' : '＋ Flag for follow-up'}
-      </button>
-
-      {theirProjects.length > 0 && (
+      {tab === 'overview' && (
         <>
-          <SectionHeader title="Projects" meta={String(theirProjects.length)} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {theirProjects.map((p) => (
-              <div
-                key={p.id}
-                onClick={() => openProject(p.id)}
-                style={{
-                  background: C.card,
-                  border: `1px solid ${C.cardBorder}`,
-                  borderLeft: `4px solid ${ACCENT[p.type]}`,
-                  borderRadius: 12,
-                  padding: '12px 13px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                }}
-              >
-                <span style={{ fontSize: 14, fontWeight: 600, flex: 1, minWidth: 0 }}>{p.name}</span>
-                <TypeBadge type={p.type} />
-              </div>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <TabHeading>About</TabHeading>
+            <button
+              onClick={() => openSheet({ type: 'person', personId: person.id })}
+              aria-label="Edit person"
+              title="Edit person"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 5,
+                cursor: 'pointer',
+                display: 'flex',
+                lineHeight: 0,
+              }}
+            >
+              <PencilIcon />
+            </button>
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              fontSize: 13.5,
+              color: C.softInk,
+              lineHeight: 1.5,
+            }}
+          >
+            {person.role && <div>{<Linkify text={person.role} />}</div>}
+            <div>
+              How we met:{' '}
+              {person.howMet ? (
+                <Linkify text={person.howMet} />
+              ) : (
+                <span style={{ color: C.muted }}>—</span>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 24 }}>
+            <button
+              onClick={() => void store.updatePerson(person.id, { followUp: !person.followUp })}
+              style={{
+                width: '100%',
+                background: person.followUp ? '#f3e6df' : C.card,
+                color: person.followUp ? C.clay : C.softInk,
+                border: `1px solid ${person.followUp ? '#e6c9bd' : C.line}`,
+                borderRadius: 13,
+                padding: 14,
+                fontFamily: 'inherit',
+                fontSize: 14.5,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {person.followUp ? '✓ Following up' : '＋ Flag for follow-up'}
+            </button>
           </div>
         </>
+      )}
+
+      {tab === 'meetings' && (
+        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {theirMeetings.map((m) => (
+            <div
+              key={m.id}
+              onClick={() => openSheet({ type: 'meeting', meetingId: m.id })}
+              style={{
+                background: C.card,
+                border: `1px solid ${C.cardBorder}`,
+                borderRadius: 12,
+                padding: '12px 13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <span style={{ fontSize: 14, flex: 1, minWidth: 0 }}>{m.title}</span>
+              <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 600 }}>
+                {shortDate(m.datetime)}
+              </span>
+            </div>
+          ))}
+          {theirMeetings.length === 0 && <EmptyState>No meetings together yet.</EmptyState>}
+        </div>
+      )}
+
+      {tab === 'projects' && (
+        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {theirProjects.map((p) => (
+            <div
+              key={p.id}
+              onClick={() => openProject(p.id)}
+              style={{
+                background: C.card,
+                border: `1px solid ${C.cardBorder}`,
+                borderLeft: `4px solid ${ACCENT[p.type]}`,
+                borderRadius: 12,
+                padding: '12px 13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 600, flex: 1, minWidth: 0 }}>{p.name}</span>
+              <TypeBadge type={p.type} />
+            </div>
+          ))}
+          {theirProjects.length === 0 && <EmptyState>Not on any projects yet.</EmptyState>}
+        </div>
       )}
 
       {/* Notes replace the old interaction log: same running history, but each
           entry is a real note that also shows in Notes and can carry a project
           or meeting. */}
-      <>
-          <SectionHeader title="Notes" meta={String(theirNotes.length)} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {theirNotes.map((n) => (
-              <div
-                key={n.id}
-                onClick={() => openSheet({ type: 'note', noteId: n.id })}
-                style={{
-                  background: C.card,
-                  border: `1px solid ${C.cardBorder}`,
-                  borderRadius: 12,
-                  padding: '12px 13px',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{n.title}</div>
-                <div
-                  style={{
-                    fontSize: 12.5,
-                    color: C.softInk,
-                    lineHeight: 1.45,
-                    marginTop: 4,
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Linkify text={n.body} />
-                </div>
-              </div>
-            ))}
-            <button
-              onClick={() => openSheet({ type: 'note', personId: person.id })}
-              style={dashedBtn}
+      {tab === 'notes' && (
+        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {theirNotes.map((n) => (
+            <div
+              key={n.id}
+              onClick={() => openSheet({ type: 'note', noteId: n.id })}
+              style={{
+                background: C.card,
+                border: `1px solid ${C.cardBorder}`,
+                borderRadius: 12,
+                padding: '12px 13px',
+                cursor: 'pointer',
+              }}
             >
-              ＋ Add a note
-            </button>
-          </div>
-        </>
-
-      {theirMeetings.length > 0 && (
-        <>
-          <SectionHeader title="Meetings" meta={String(theirMeetings.length)} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {theirMeetings.map((m) => (
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{n.title}</div>
               <div
-                key={m.id}
-                onClick={() => openSheet({ type: 'meeting', meetingId: m.id })}
                 style={{
-                  background: C.card,
-                  border: `1px solid ${C.cardBorder}`,
-                  borderRadius: 12,
-                  padding: '12px 13px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
+                  fontSize: 12.5,
+                  color: C.softInk,
+                  lineHeight: 1.45,
+                  marginTop: 4,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
                 }}
               >
-                <span style={{ fontSize: 14, flex: 1 }}>{m.title}</span>
-                <span style={{ fontSize: 11.5, color: C.muted, fontWeight: 600 }}>
-                  {shortDate(m.datetime)}
-                </span>
+                <Linkify text={n.body} />
               </div>
-            ))}
-          </div>
-        </>
+            </div>
+          ))}
+          {theirNotes.length === 0 && <EmptyState>No notes about them yet.</EmptyState>}
+          <button onClick={() => openSheet({ type: 'note', personId: person.id })} style={dashedBtn}>
+            ＋ Add a note
+          </button>
+        </div>
       )}
+
+      {/* Keeps the last row clear of the bottom nav and the + button. */}
+      <div style={{ height: 8 }} />
     </div>
   );
 }

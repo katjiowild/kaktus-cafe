@@ -92,6 +92,13 @@ export interface Store extends Data {
     milestoneId: string,
     date: string | null,
   ) => Promise<void>;
+  /** Text and date together, for the edit sheet — one write, one re-render. */
+  updateMilestone: (
+    projectId: string,
+    milestoneId: string,
+    text: string,
+    date: string | null,
+  ) => Promise<void>;
   toggleMilestone: (projectId: string, milestoneId: string) => Promise<void>;
   removeMilestone: (projectId: string, milestoneId: string) => Promise<void>;
   moveMilestone: (projectId: string, milestoneId: string, dir: -1 | 1) => Promise<void>;
@@ -449,6 +456,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await db.projects.update(projectId, {
           milestones: p.milestones.map((ms) => (ms.id === milestoneId ? { ...ms, date } : ms)),
         });
+        await after();
+      },
+
+      async updateMilestone(projectId, milestoneId, text, date) {
+        const p = await db.projects.get(projectId);
+        if (!p) return;
+        await db.projects.update(projectId, {
+          milestones: p.milestones.map((ms) =>
+            ms.id === milestoneId ? { ...ms, text, date } : ms,
+          ),
+        });
+        await touchProject(projectId);
         await after();
       },
 

@@ -29,6 +29,12 @@ export type SheetState =
       title: string;
       label: string;
       placeholder: string;
+      /** Editing an existing milestone rather than adding one. Milestones are
+       *  the only mini kind that can be reopened; ptask and subtask both hand
+       *  off to rows that own their own editing. */
+      editId?: string;
+      initialText?: string;
+      initialDate?: string | null;
     };
 
 export function SheetShell({
@@ -1207,12 +1213,18 @@ function PersonSheet({
 
 function MiniSheet({ state, onClose }: { state: SheetState & { type: 'mini' }; onClose: () => void }) {
   const store = useStore();
-  const [value, setValue] = useState('');
-  const [date, setDate] = useState('');
+  const [value, setValue] = useState(state.initialText ?? '');
+  const [date, setDate] = useState(state.initialDate ?? '');
 
   const save = async () => {
     const v = value.trim();
     if (!v) {
+      // Blanking the field is a cancel, not a request to erase the milestone.
+      onClose();
+      return;
+    }
+    if (state.editId) {
+      await store.updateMilestone(state.ctx, state.editId, v, date || null);
       onClose();
       return;
     }
@@ -1262,8 +1274,20 @@ function MiniSheet({ state, onClose }: { state: SheetState & { type: 'mini' }; o
         </Field>
       )}
       <button onClick={() => void save()} style={{ ...primaryBtn, marginTop: 18 }}>
-        Save
+        {state.editId ? 'Save changes' : 'Save'}
       </button>
+      {/* The row's × is now an edit pencil, so this is the only way to remove a
+          milestone — same place project delete lives. */}
+      {state.editId && (
+        <DeleteButton
+          onClick={() => {
+            void store.removeMilestone(state.ctx, state.editId!);
+            onClose();
+          }}
+        >
+          Delete milestone
+        </DeleteButton>
+      )}
     </>
   );
 }

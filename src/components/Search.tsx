@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { C, NARROW_MAX, WIDE_MAX } from '../tokens';
 import { useStore } from '../store';
-import { SearchIcon } from './ui';
+import { NavIcon, SearchIcon } from './ui';
 import type { SheetState } from './Sheet';
 
 interface Result {
@@ -41,7 +41,7 @@ export function Search({
         id: t.id,
         title: t.title,
         sub: 'Task' + (p ? ` · ${p.name}` : ''),
-        icon: '✓',
+        icon: 'tasks',
         open: () => {
           onClose();
           openSheet({ type: 'task', taskId: t.id });
@@ -54,7 +54,7 @@ export function Search({
         id: n.id,
         title: n.title,
         sub: 'Note',
-        icon: '✎',
+        icon: 'notes',
         open: () => {
           onClose();
           openSheet({ type: 'note', noteId: n.id });
@@ -67,7 +67,7 @@ export function Search({
         id: p.id,
         title: p.name,
         sub: `Project · ${p.type[0].toUpperCase()}${p.type.slice(1)}`,
-        icon: '▤',
+        icon: 'projects',
         open: () => {
           onClose();
           openProject(p.id);
@@ -84,7 +84,7 @@ export function Search({
         id: m.id,
         title: m.title,
         sub: `Meeting · ${new Date(m.datetime).toLocaleDateString('en', { month: 'short', day: 'numeric' })}`,
-        icon: '◷',
+        icon: 'meetings',
         open: () => {
           onClose();
           openSheet({ type: 'meeting', meetingId: m.id });
@@ -98,7 +98,7 @@ export function Search({
         id: pe.id,
         title: pe.name,
         sub: 'Person' + (pe.role ? ` · ${pe.role}` : ''),
-        icon: '☺',
+        icon: 'people',
         open: () => {
           onClose();
           openPerson(pe.id);
@@ -204,12 +204,11 @@ export function Search({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 15,
                 flexShrink: 0,
                 color: C.sage,
               }}
             >
-              {r.icon}
+              <NavIcon name={r.icon} size={17} />
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14.5, fontWeight: 600, color: C.ink }}>{r.title}</div>
