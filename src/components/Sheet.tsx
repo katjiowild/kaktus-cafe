@@ -300,6 +300,44 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
       </Field>
 
       <Field>
+        <ProjectSelect value={projectId} onChange={setProjectId} />
+      </Field>
+
+      <Field>
+        <div style={{ display: 'flex', gap: 10, opacity: pending ? 0.45 : 1 }}>
+          <div style={{ flex: 1 }}>
+            <label style={label}>Due</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              disabled={pending}
+              style={input}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={label}>Time (optional)</label>
+            <input
+              type="time"
+              value={dueTime}
+              onChange={(e) => setDueTime(e.target.value)}
+              disabled={pending}
+              style={input}
+            />
+          </div>
+        </div>
+      </Field>
+
+      <Field top={16}>
+        <ToggleRow
+          icon={<FlameIcon />}
+          label="Mark as urgent"
+          on={urgent}
+          onToggle={() => setUrgent((u) => !u)}
+        />
+      </Field>
+
+      <Field>
         <ToggleRow
           icon={<ClockIcon />}
           label="Pending — no date or time yet"
@@ -317,47 +355,9 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
 
       {!pending && (
         <Field>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <label style={label}>Due</label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                style={input}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={label}>Time (optional)</label>
-              <input
-                type="time"
-                value={dueTime}
-                onChange={(e) => setDueTime(e.target.value)}
-                style={input}
-              />
-            </div>
-          </div>
-        </Field>
-      )}
-
-      <Field>
-        <ProjectSelect value={projectId} onChange={setProjectId} />
-      </Field>
-
-      {!pending && (
-        <Field>
           <RepeatPicker value={recurrence} onChange={setRecurrence} />
         </Field>
       )}
-
-      <Field top={16}>
-        <ToggleRow
-          icon={<FlameIcon />}
-          label="Mark as urgent"
-          on={urgent}
-          onToggle={() => setUrgent((u) => !u)}
-        />
-      </Field>
 
       {existing && (
         <Field top={16}>
