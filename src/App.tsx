@@ -3,6 +3,8 @@ import { C, NARROW_MAX, SERIF, TYPE, WIDE_BREAKPOINT, WIDE_MAX } from './tokens'
 import { useStore } from './store';
 import { BottomNav, RadialMenu, Scrim, type AddKind } from './components/Chrome';
 import { Sheet, type SheetState } from './components/Sheet';
+import { WhatsNew } from './components/WhatsNew';
+import { LATEST_CHANGELOG } from './lib/changelog';
 import { HamburgerIcon, SearchIcon, Toast } from './components/ui';
 import { Search } from './components/Search';
 import { Today } from './views/Today';
@@ -412,6 +414,17 @@ export function App() {
           openProject={openProject}
           openPerson={openPerson}
           openSheet={openSheet}
+        />
+      )}
+
+      {/* One-time "what's new" popup — shown once per entry in lib/changelog.ts.
+          Gated off any open sheet/search so it never stacks with one; in
+          practice there's nothing to open before this first paints anyway. */}
+      {!sheet && !searchOpen && store.lastSeenChangelogId !== LATEST_CHANGELOG.id && (
+        <WhatsNew
+          entry={LATEST_CHANGELOG}
+          wide={wide}
+          onDismiss={() => void store.markChangelogSeen(LATEST_CHANGELOG.id)}
         />
       )}
 
