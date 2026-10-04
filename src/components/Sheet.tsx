@@ -340,7 +340,7 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
       <Field>
         <ToggleRow
           icon={<ClockIcon />}
-          label="Pending — no date or time yet"
+          label="Save for later"
           on={pending}
           onToggle={() =>
             setPending((p) => {
