@@ -522,6 +522,25 @@ export function FlameIcon({ size = 15, color = C.clay }: { size?: number; color?
   );
 }
 
+export function ClockIcon({ size = 15, color = C.muted }: { size?: number; color?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flexShrink: 0 }}
+    >
+      <circle cx={12} cy={12} r={9} />
+      <path d="M12 7v5l3.5 2" />
+    </svg>
+  );
+}
+
 export function HamburgerIcon({ size = 22 }: { size?: number }) {
   return (
     <svg

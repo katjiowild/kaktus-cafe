@@ -116,6 +116,9 @@ export interface Store extends Data {
   updateTask: (id: string, patch: Partial<Task>) => Promise<void>;
   toggleTask: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
+  /** Bulk-converts dated tasks to pending (no date/time) — the way out of a
+   *  pile-up after time away, so it doesn't have to be done one at a time. */
+  markTasksPending: (ids: string[]) => Promise<void>;
   addSubtask: (taskId: string, text: string) => Promise<void>;
   toggleSubtask: (taskId: string, subId: string) => Promise<void>;
   removeSubtask: (taskId: string, subId: string) => Promise<void>;
@@ -614,6 +617,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await db.tasks.delete(id);
         await after();
         showToast('Task deleted');
+      },
+
+      async markTasksPending(ids) {
+        if (ids.length === 0) return;
+        const now = isoNow();
+        await Promise.all(
+          ids.map((id) => db.tasks.update(id, { dueDate: null, dueTime: null, updatedAt: now })),
+        );
+        await after();
+        showToast(`Marked ${ids.length} ${ids.length === 1 ? 'task' : 'tasks'} as pending`);
       },
 
       async addSubtask(taskId, text) {
