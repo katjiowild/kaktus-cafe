@@ -47,6 +47,9 @@ interface Data {
   dismissed: string[];
   accounts: CalendarAccount[];
   defaultWriteAccountId: string | null;
+  /** id of the last "what's new" changelog entry this person has dismissed —
+   *  see lib/changelog.ts. Null means they've never seen one. */
+  lastSeenChangelogId: string | null;
 }
 
 const EMPTY: Data = {
@@ -58,6 +61,7 @@ const EMPTY: Data = {
   dismissed: [],
   accounts: [],
   defaultWriteAccountId: null,
+  lastSeenChangelogId: null,
 };
 
 export interface Store extends Data {
@@ -152,6 +156,10 @@ export interface Store extends Data {
 
   dismissNudge: (projectId: string) => Promise<void>;
 
+  /** Marks a "what's new" changelog entry as seen, so its popup doesn't show
+   *  again — see lib/changelog.ts and components/WhatsNew.tsx. */
+  markChangelogSeen: (id: string) => Promise<void>;
+
   // ---------- Calendar sync (v5 §3–4) ----------
   accounts: CalendarAccount[];
   syncing: boolean;
@@ -221,18 +229,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [syncing, setSyncing] = useState(false);
 
   const reload = useCallback(async () => {
-    const [projects, tasks, notes, meetings, people, dismissed, accounts] = await Promise.all([
-      db.projects.toArray(),
-      db.tasks.toArray(),
-      db.notes.toArray(),
-      db.meetings.toArray(),
-      db.people.toArray(),
-      getSetting<string[]>('dismissedNudges', []),
-      loadAccounts(),
-    ]);
+    const [projects, tasks, notes, meetings, people, dismissed, accounts, lastSeenChangelogId] =
+      await Promise.all([
+        db.projects.toArray(),
+        db.tasks.toArray(),
+        db.notes.toArray(),
+        db.meetings.toArray(),
+        db.people.toArray(),
+        getSetting<string[]>('dismissedNudges', []),
+        loadAccounts(),
+        getSetting<string | null>('lastSeenChangelogId', null),
+      ]);
     const defaultWriteAccountId = await getDefaultWriteAccountId();
     setData({
-      projects, tasks, notes, meetings, people, dismissed, accounts, defaultWriteAccountId,
+      projects,
+      tasks,
+      notes,
+      meetings,
+      people,
+      dismissed,
+      accounts,
+      defaultWriteAccountId,
+      lastSeenChangelogId,
     });
   }, []);
 
@@ -839,6 +857,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!dismissed.includes(projectId)) {
           await setSetting('dismissedNudges', [...dismissed, projectId]);
         }
+        await after();
+      },
+
+      // ---------- Changelog ----------
+      async markChangelogSeen(id) {
+        await setSetting('lastSeenChangelogId', id);
         await after();
       },
 
