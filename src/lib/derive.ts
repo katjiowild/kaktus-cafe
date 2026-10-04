@@ -174,9 +174,15 @@ export function projectMeta(
 
   const points = growthPoints(all);
   const stage = stageFromPoints(points);
-  // Areas stay the one exception to wilting: a reference home you consult
-  // every few weeks isn't neglected, and browning it would cry wolf.
-  const vitality: Vitality = project.type === 'area' ? 'healthy' : vitalityFor(days);
+  // Areas stay one exception to wilting: a reference home you consult every
+  // few weeks isn't neglected, and browning it would cry wolf. On-hold and
+  // done are the other: a project you deliberately parked or already
+  // finished isn't neglected either — it's resting, not withering, so it
+  // never browns regardless of how long it sits there. (Vitality is derived
+  // fresh on every read, never stored, so this also instantly "un-wilts" a
+  // project the moment its status changes — nothing to migrate or reset.)
+  const vitality: Vitality =
+    project.type === 'area' || project.status !== 'active' ? 'healthy' : vitalityFor(days);
 
   const nudge =
     project.type === 'active' &&
