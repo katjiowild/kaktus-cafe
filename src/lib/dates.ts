@@ -58,7 +58,7 @@ export function isOverdue(dueDate: string | null, done: boolean): boolean {
 
 /** "Today" / "Tomorrow" / "Yesterday" / "Sep 14". */
 export function dueLabel(iso: string | null): string {
-  if (!iso) return 'No date';
+  if (!iso) return 'Pending';
   const diff = daysBetween(today(), parseDate(iso));
   if (diff === 0) return 'Today';
   if (diff === 1) return 'Tomorrow';

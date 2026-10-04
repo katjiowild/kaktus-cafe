@@ -4,7 +4,7 @@ import { useStore, type TemplateKey } from '../store';
 import { isoDate, WEEKDAY_LETTERS } from '../lib/dates';
 import type { Cadence, ProjectType, Recurrence } from '../types';
 import { SPECIES, speciesOr, type PlantSpecies } from '../lib/species';
-import { Checkbox, FlameIcon, LocationIcon, PinIcon, ToggleRow } from './ui';
+import { Checkbox, ClockIcon, FlameIcon, LocationIcon, PinIcon, ToggleRow } from './ui';
 import { Plant } from './Plant';
 import { PersonPicker } from './PersonPicker';
 import { Linkify } from './Linkify';
@@ -245,6 +245,10 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
   );
   const [dueDate, setDueDate] = useState<string>(existing?.dueDate ?? isoDate());
   const [dueTime, setDueTime] = useState<string>(existing?.dueTime ?? '');
+  // Pending = no date/time at all — for when a task is worth capturing but
+  // isn't worth scheduling yet. Defaults from whether the task already has no
+  // date, so reopening a pending task keeps showing it as pending.
+  const [pending, setPending] = useState<boolean>(existing ? existing.dueDate === null : false);
   const [recurrence, setRecurrence] = useState<Recurrence | null>(existing?.recurrence ?? null);
   const [urgent, setUrgent] = useState<boolean>(existing?.urgent ?? false);
   const [newSub, setNewSub] = useState('');
@@ -263,8 +267,8 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
       await store.updateTask(existing.id, {
         title: t,
         projectId,
-        dueDate: dueDate || null,
-        dueTime: dueTime || null,
+        dueDate: pending ? null : dueDate || null,
+        dueTime: pending ? null : dueTime || null,
         recurrence,
         urgent,
       });
@@ -273,8 +277,8 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
       await store.createTask({
         title: t,
         projectId,
-        dueDate: dueDate || null,
-        dueTime: dueTime || null,
+        dueDate: pending ? null : dueDate || null,
+        dueTime: pending ? null : dueTime || null,
         recurrence,
         urgent,
       });
@@ -296,35 +300,55 @@ function TaskSheet({ state, onClose }: { state: SheetState & { type: 'task' }; o
       </Field>
 
       <Field>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <div style={{ flex: 1 }}>
-            <label style={label}>Due</label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              style={input}
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={label}>Time (optional)</label>
-            <input
-              type="time"
-              value={dueTime}
-              onChange={(e) => setDueTime(e.target.value)}
-              style={input}
-            />
-          </div>
-        </div>
+        <ToggleRow
+          icon={<ClockIcon />}
+          label="Pending — no date or time yet"
+          on={pending}
+          onToggle={() =>
+            setPending((p) => {
+              // A pending task can't also repeat — repetition needs a date
+              // to count forward from.
+              if (!p) setRecurrence(null);
+              return !p;
+            })
+          }
+        />
       </Field>
+
+      {!pending && (
+        <Field>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={label}>Due</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                style={input}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={label}>Time (optional)</label>
+              <input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                style={input}
+              />
+            </div>
+          </div>
+        </Field>
+      )}
 
       <Field>
         <ProjectSelect value={projectId} onChange={setProjectId} />
       </Field>
 
-      <Field>
-        <RepeatPicker value={recurrence} onChange={setRecurrence} />
-      </Field>
+      {!pending && (
+        <Field>
+          <RepeatPicker value={recurrence} onChange={setRecurrence} />
+        </Field>
+      )}
 
       <Field top={16}>
         <ToggleRow
