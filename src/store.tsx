@@ -9,7 +9,13 @@ import {
 } from 'react';
 import { db, GARDEN_SLOTS, getSetting, setSetting, uid } from './db';
 import { isoDate, isoNow, nextOccurrence, parseDate, today } from './lib/dates';
-import type { PlantSpecies } from './lib/species';
+import {
+  RARITY_LABEL,
+  rollSpecies,
+  speciesLabel,
+  SPECIES_RARITY,
+  type PlantSpecies,
+} from './lib/species';
 import {
   createGoogleEvent,
   withCalendarLock,
@@ -47,6 +53,9 @@ interface Data {
   dismissed: string[];
   accounts: CalendarAccount[];
   defaultWriteAccountId: string | null;
+  /** Species that have appeared on at least one project so far — drives which
+   *  silhouettes the (future) Plant List page can reveal. */
+  discoveredSpecies: PlantSpecies[];
 }
 
 const EMPTY: Data = {
@@ -58,6 +67,7 @@ const EMPTY: Data = {
   dismissed: [],
   accounts: [],
   defaultWriteAccountId: null,
+  discoveredSpecies: [],
 };
 
 export interface Store extends Data {
@@ -69,7 +79,6 @@ export interface Store extends Data {
   createProject: (input: {
     name: string;
     type: ProjectType;
-    species: PlantSpecies;
     template: TemplateKey;
     description?: string;
     startDate?: string | null;
@@ -218,18 +227,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [syncing, setSyncing] = useState(false);
 
   const reload = useCallback(async () => {
-    const [projects, tasks, notes, meetings, people, dismissed, accounts] = await Promise.all([
-      db.projects.toArray(),
-      db.tasks.toArray(),
-      db.notes.toArray(),
-      db.meetings.toArray(),
-      db.people.toArray(),
-      getSetting<string[]>('dismissedNudges', []),
-      loadAccounts(),
-    ]);
+    const [projects, tasks, notes, meetings, people, dismissed, accounts, discoveredSpecies] =
+      await Promise.all([
+        db.projects.toArray(),
+        db.tasks.toArray(),
+        db.notes.toArray(),
+        db.meetings.toArray(),
+        db.people.toArray(),
+        getSetting<string[]>('dismissedNudges', []),
+        loadAccounts(),
+        getSetting<PlantSpecies[]>('discoveredSpecies', []),
+      ]);
     const defaultWriteAccountId = await getDefaultWriteAccountId();
     setData({
-      projects, tasks, notes, meetings, people, dismissed, accounts, defaultWriteAccountId,
+      projects,
+      tasks,
+      notes,
+      meetings,
+      people,
+      dismissed,
+      accounts,
+      defaultWriteAccountId,
+      discoveredSpecies,
     });
   }, []);
 
@@ -296,18 +315,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       reload,
 
       // ---------- Projects ----------
-      async createProject({
-        name,
-        type,
-        species,
-        template,
-        description,
-        startDate,
-        endDate,
-        cadence,
-      }) {
+      async createProject({ name, type, template, description, startDate, endDate, cadence }) {
         const id = uid('proj');
         const now = isoNow();
+        // Gacha roll, not a pick — see lib/species.ts. Record it as discovered
+        // straight away so a species you already have doesn't show up locked
+        // on the (future) Plant List page.
+        const species = rollSpecies();
+        const discoveredSpecies = await getSetting<PlantSpecies[]>('discoveredSpecies', []);
+        if (!discoveredSpecies.includes(species)) {
+          await setSetting('discoveredSpecies', [...discoveredSpecies, species]);
+        }
         const milestones =
           type === 'active' && template !== 'blank' && template !== 'upkeep'
             ? TEMPLATES[template].map((text) => ({
@@ -358,6 +376,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           });
         }
         await after();
+        showToast(`Project created — you got a ${RARITY_LABEL[SPECIES_RARITY[species]]} ${speciesLabel(species)}!`);
         return id;
       },
 

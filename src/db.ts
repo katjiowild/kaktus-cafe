@@ -236,6 +236,18 @@ class KaktusDB extends Dexie {
             if (!p.species) p.species = BY_TYPE[p.type] ?? DEFAULT_SPECIES;
           });
       });
+
+    // v12 — species is now gacha-rolled at creation instead of picked, so the
+    // new Plant List page needs to know which species have already been
+    // "discovered". Backfilled from every project's current species, so
+    // nothing you're already growing shows up as a locked silhouette.
+    this.version(12)
+      .stores({})
+      .upgrade(async (tx) => {
+        const projects = await tx.table<Project>('projects').toArray();
+        const discovered = [...new Set(projects.map((p) => p.species).filter(Boolean))];
+        await tx.table<Setting>('settings').put({ key: 'discoveredSpecies', value: discovered });
+      });
   }
 }
 

@@ -234,8 +234,9 @@ export function VisualSystem() {
     <div style={{ animation: 'sbfade .3s ease' }}>
       <div style={{ fontSize: 13, color: C.softInk, lineHeight: 1.5, margin: '4px 2px' }}>
         Two independent signals live in one plant: <b>size shows work done</b>,{' '}
-        <b>colour shows recency of care</b>. Which plant it is, is your choice — species
-        carries no meaning.
+        <b>colour shows recency of care</b>. Which plant it is gets rolled at random when
+        you create the project — some species are rarer than others, but it's purely for
+        the fun of collecting; it carries no meaning either way.
       </div>
 
       <div style={h}>Growth — from completed tasks</div>
