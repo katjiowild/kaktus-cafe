@@ -5,123 +5,159 @@ import { VITALITY_LABEL, type Vitality } from '../lib/derive';
 import { Plant } from '../components/Plant';
 import { Card, EmptyState, LocationIcon, NavIcon, SourceBadge } from '../components/ui';
 import type { View, ViewProps } from './types';
+import type { Meeting } from '../types';
 import { Linkify } from '../components/Linkify';
 
 // ---------------- Meetings ----------------
 
 export function Meetings({ openSheet }: ViewProps) {
-  const { meetings, notes } = useStore();
-  const accountEmail = useAccountEmail();
-  const notesFor = (meetingId: string) => notes.filter((n) => n.meetingId === meetingId);
-  const sorted = [...meetings].sort((a, b) => a.datetime.localeCompare(b.datetime));
+  const { meetings } = useStore();
+
+  // A meeting earlier today is past, one later today is upcoming — so this
+  // needs the full datetime, not just today's date. Meeting.datetime is
+  // always a UTC ISO string (new Date(...).toISOString(), both for locally
+  // created meetings and synced ones), so plain string comparison sorts and
+  // splits correctly without parsing.
+  const nowIso = new Date().toISOString();
+  const upcoming = meetings
+    .filter((m) => m.datetime >= nowIso)
+    .sort((a, b) => a.datetime.localeCompare(b.datetime)); // soonest first
+  const past = meetings
+    .filter((m) => m.datetime < nowIso)
+    .sort((a, b) => b.datetime.localeCompare(a.datetime)); // most recent first
 
   return (
-    <div
-      style={{
-        animation: 'sbfade .3s ease',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 11,
-        marginTop: 6,
-      }}
+    <div style={{ animation: 'sbfade .3s ease', marginTop: 6 }}>
+      {meetings.length === 0 && (
+        <EmptyState>Nothing on the books. Tap + to add a meeting.</EmptyState>
+      )}
+
+      {upcoming.length > 0 && (
+        <>
+          <div style={{ ...sectionHeader, margin: '2px 2px 10px' }}>Upcoming</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+            {upcoming.map((m) => (
+              <MeetingCard key={m.id} meeting={m} openSheet={openSheet} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {past.length > 0 && (
+        <>
+          <div style={{ ...sectionHeader, margin: upcoming.length > 0 ? '22px 2px 10px' : '2px 2px 10px' }}>
+            Past
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+            {past.map((m) => (
+              <MeetingCard key={m.id} meeting={m} openSheet={openSheet} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MeetingCard({
+  meeting: m,
+  openSheet,
+}: {
+  meeting: Meeting;
+  openSheet: ViewProps['openSheet'];
+}) {
+  const { notes } = useStore();
+  const accountEmail = useAccountEmail();
+  const mNotes = notes.filter((n) => n.meetingId === m.id);
+  const d = new Date(m.datetime);
+
+  return (
+    <Card
+      onClick={() => openSheet({ type: 'meeting', meetingId: m.id })}
+      style={{ display: 'flex', gap: 13 }}
     >
-      {sorted.map((m) => {
-        const d = new Date(m.datetime);
-        return (
-          <Card
-            key={m.id}
-            onClick={() => openSheet({ type: 'meeting', meetingId: m.id })}
-            style={{ display: 'flex', gap: 13 }}
+      <div
+        style={{
+          flexShrink: 0,
+          textAlign: 'center',
+          background: C.deepSage,
+          color: C.paper,
+          borderRadius: 11,
+          padding: '8px 10px',
+          minWidth: 52,
+          height: 'fit-content',
+        }}
+      >
+        <div style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1, fontWeight: 500 }}>
+          {d.getDate()}
+        </div>
+        <div
+          style={{
+            fontSize: 10,
+            textTransform: 'uppercase',
+            letterSpacing: '.1em',
+            opacity: 0.8,
+            marginTop: 3,
+          }}
+        >
+          {d.toLocaleDateString('en', { month: 'short' })}
+        </div>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ fontWeight: 600, fontSize: 15 }}>{m.title}</span>
+          <SourceBadge source={m.source} account={accountEmail(m.accountId)} />
+        </div>
+        <div style={{ fontSize: 12, color: C.clay, fontWeight: 600, marginTop: 2 }}>
+          {timeLabel(m.datetime)} · {shortDate(m.datetime)}
+        </div>
+        {m.peopleText && (
+          <div style={{ fontSize: 12.5, color: C.softInk, marginTop: 6 }}>With {m.peopleText}</div>
+        )}
+        {m.location && (
+          <div
+            style={{
+              fontSize: 12,
+              color: C.muted,
+              marginTop: 3,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <LocationIcon /> <Linkify text={m.location} />
+          </div>
+        )}
+        {mNotes.length > 0 && (
+          <div
+            style={{
+              marginTop: 7,
+              paddingTop: 7,
+              borderTop: `1px solid ${C.line}`,
+            }}
           >
             <div
               style={{
-                flexShrink: 0,
-                textAlign: 'center',
-                background: C.deepSage,
-                color: C.paper,
-                borderRadius: 11,
-                padding: '8px 10px',
-                minWidth: 52,
-                height: 'fit-content',
+                fontSize: 12.5,
+                color: C.softInk,
+                lineHeight: 1.45,
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
               }}
             >
-              <div style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1, fontWeight: 500 }}>
-                {d.getDate()}
-              </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  textTransform: 'uppercase',
-                  letterSpacing: '.1em',
-                  opacity: 0.8,
-                  marginTop: 3,
-                }}
-              >
-                {d.toLocaleDateString('en', { month: 'short' })}
-              </div>
+              {mNotes[0].body}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                <span style={{ fontWeight: 600, fontSize: 15 }}>{m.title}</span>
-                <SourceBadge source={m.source} account={accountEmail(m.accountId)} />
+            {mNotes.length > 1 && (
+              <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginTop: 4 }}>
+                +{mNotes.length - 1} more {mNotes.length === 2 ? 'note' : 'notes'}
               </div>
-              <div style={{ fontSize: 12, color: C.clay, fontWeight: 600, marginTop: 2 }}>
-                {timeLabel(m.datetime)} · {shortDate(m.datetime)}
-              </div>
-              {m.peopleText && (
-                <div style={{ fontSize: 12.5, color: C.softInk, marginTop: 6 }}>
-                  With {m.peopleText}
-                </div>
-              )}
-              {m.location && (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: C.muted,
-                    marginTop: 3,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                >
-                  <LocationIcon /> <Linkify text={m.location} />
-                </div>
-              )}
-              {notesFor(m.id).length > 0 && (
-                <div
-                  style={{
-                    marginTop: 7,
-                    paddingTop: 7,
-                    borderTop: `1px solid ${C.line}`,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 12.5,
-                      color: C.softInk,
-                      lineHeight: 1.45,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {notesFor(m.id)[0].body}
-                  </div>
-                  {notesFor(m.id).length > 1 && (
-                    <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginTop: 4 }}>
-                      +{notesFor(m.id).length - 1} more{' '}
-                      {notesFor(m.id).length === 2 ? 'note' : 'notes'}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </Card>
-        );
-      })}
-      {sorted.length === 0 && <EmptyState>Nothing on the books. Tap + to add a meeting.</EmptyState>}
-    </div>
+            )}
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }
 
@@ -129,7 +165,7 @@ export function Meetings({ openSheet }: ViewProps) {
 
 const MORE: { view: View; label: string; sub: string; icon: string }[] = [
   { view: 'tasks', label: 'Tasks', sub: 'Every open & completed task', icon: 'tasks' },
-  { view: 'meetings', label: 'Meetings', sub: 'Everything on the books', icon: 'meetings' },
+  { view: 'meetings', label: 'Meetings / Events', sub: 'Everything on the books', icon: 'meetings' },
   { view: 'people', label: 'People', sub: 'Your light CRM', icon: 'people' },
   { view: 'system', label: 'Visual system', sub: 'Plants, types & the radial menu', icon: 'system' },
   {

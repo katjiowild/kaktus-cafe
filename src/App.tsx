@@ -53,7 +53,7 @@ const TITLES: Record<View, string> = {
   focus: 'Focus',
   more: 'More',
   tasks: 'Tasks',
-  meetings: 'Meetings',
+  meetings: 'Meetings / Events',
   people: 'People',
   personDetail: 'Person',
   settings: 'Settings',
