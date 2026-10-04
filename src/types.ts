@@ -42,7 +42,9 @@ export interface Project {
   lastActivityDate: string;
   /** ISO date, set when status becomes 'done'. */
   completedOn: string | null;
-  /** Which succulent stands for this project. Chosen, never derived. */
+  /** Which succulent stands for this project. Rolled once at creation
+   *  (gacha — see lib/species.ts) and fixed thereafter; never chosen or
+   *  re-rolled by editing. */
   species: PlantSpecies;
   /** Floats to the top of its Greenhouse tab. Capped at GARDEN_SLOTS, because
    *  these are also the projects the Garden page will feature. */
