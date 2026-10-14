@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { C, SERIF, sectionHeader } from '../tokens';
 import { useAccountEmail, useStore } from '../store';
 import { isoDate, timeLabel } from '../lib/dates';
-import { projectMeta, sortOpenTasks } from '../lib/derive';
+import { meetingAttendees, projectMeta, sortOpenTasks } from '../lib/derive';
 import { Plant } from '../components/Plant';
 import { TaskLine } from '../components/TaskRow';
 import { Card, EmptyState, LocationIcon, NavIcon, SourceBadge } from '../components/ui';
@@ -22,7 +22,7 @@ export function Today({
   const cancelled = useRef(false);
   const store = useStore();
   const accountEmail = useAccountEmail();
-  const { projects, tasks, meetings, notes, dismissed } = store;
+  const { projects, tasks, meetings, notes, people, dismissed } = store;
   const todayIso = isoDate();
   const notesFor = (meetingId: string) => notes.filter((n) => n.meetingId === meetingId);
 
@@ -231,58 +231,61 @@ export function Today({
         <div style={sectionHeader}>Up next</div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-        {todayMeetings.map((m) => (
-          <Card
-            key={m.id}
-            onClick={() => openSheet({ type: 'meeting', meetingId: m.id })}
-            style={{ padding: '13px 15px', display: 'flex', gap: 13, alignItems: 'center' }}
-          >
-            <div style={{ flexShrink: 0, width: 46, textAlign: 'center' }}>
-              <div style={{ fontFamily: SERIF, fontSize: 19, fontWeight: 500, color: C.deepSage }}>
-                {timeLabel(m.datetime)}
+        {todayMeetings.map((m) => {
+          const attendees = meetingAttendees(m, people);
+          return (
+            <Card
+              key={m.id}
+              onClick={() => openSheet({ type: 'meeting', meetingId: m.id })}
+              style={{ padding: '13px 15px', display: 'flex', gap: 13, alignItems: 'center' }}
+            >
+              <div style={{ flexShrink: 0, width: 46, textAlign: 'center' }}>
+                <div style={{ fontFamily: SERIF, fontSize: 19, fontWeight: 500, color: C.deepSage }}>
+                  {timeLabel(m.datetime)}
+                </div>
               </div>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 14.5 }}>{m.title}</div>
-              {m.peopleText && (
-                <div style={{ fontSize: 12.5, color: C.softInk, marginTop: 3 }}>
-                  With {m.peopleText}
-                </div>
-              )}
-              {m.location && (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: C.muted,
-                    marginTop: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                >
-                  <LocationIcon /> <Linkify text={m.location} />
-                </div>
-              )}
-              {notesFor(m.id).length > 0 && (
-                <div
-                  style={{
-                    fontSize: 12.5,
-                    color: C.softInk,
-                    marginTop: 6,
-                    lineHeight: 1.45,
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {notesFor(m.id)[0].body}
-                </div>
-              )}
-            </div>
-            <SourceBadge source={m.source} account={accountEmail(m.accountId)} />
-          </Card>
-        ))}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 14.5 }}>{m.title}</div>
+                {attendees.length > 0 && (
+                  <div style={{ fontSize: 12.5, color: C.softInk, marginTop: 3 }}>
+                    With {attendees.join(', ')}
+                  </div>
+                )}
+                {m.location && (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: C.muted,
+                      marginTop: 2,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <LocationIcon /> <Linkify text={m.location} />
+                  </div>
+                )}
+                {notesFor(m.id).length > 0 && (
+                  <div
+                    style={{
+                      fontSize: 12.5,
+                      color: C.softInk,
+                      marginTop: 6,
+                      lineHeight: 1.45,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {notesFor(m.id)[0].body}
+                  </div>
+                )}
+              </div>
+              <SourceBadge source={m.source} account={accountEmail(m.accountId)} />
+            </Card>
+          );
+        })}
         {todayMeetings.length === 0 && (
           <div style={{ textAlign: 'center', padding: 22, color: C.muted, fontSize: 13.5 }}>
             No meetings today.
