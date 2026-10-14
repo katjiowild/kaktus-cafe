@@ -1,4 +1,4 @@
-import type { Note, Project, Task } from '../types';
+import type { Meeting, Note, Person, Project, Task } from '../types';
 import { addDays, addMonths, daysSince, isOverdue, parseDate, today } from './dates';
 
 /**
@@ -206,4 +206,26 @@ export function projectMeta(
     nudge,
     streak,
   };
+}
+
+/**
+ * Everyone on a meeting, as one list of names: the linked People first (the
+ * "With" picker), then the free-text "Anyone else" names. Free-text names
+ * that repeat a linked Person are dropped, so nobody shows twice.
+ */
+export function meetingAttendees(meeting: Meeting, people: Person[]): string[] {
+  const linked = meeting.personIds
+    .map((id) => people.find((p) => p.id === id)?.name)
+    .filter((name): name is string => Boolean(name));
+  const seen = new Set(linked.map((n) => n.trim().toLowerCase()));
+  const extra = meeting.peopleText
+    .split(',')
+    .map((n) => n.trim())
+    .filter((n) => {
+      const key = n.toLowerCase();
+      if (!n || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  return [...linked, ...extra];
 }
